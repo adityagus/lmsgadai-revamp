@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { effectScope } from 'vue';
+import { useCourseList } from '../../resources/js/composables/useCourseList.mjs';
+
+test('pagination keeps visible data, ignores stale responses, and supports retry', async () => {
+  const requests = [];
+  const scope = effectScope();
+  const list = scope.run(() => useCourseList(page => new Promise((resolve, reject) => requests.push({ page, resolve, reject }))));
+  const first = list.fetchCourses();
+  requests[0].resolve({ data: [{ id: 1 }], meta: { last_page: 3 } });
+  await first;
+  assert.equal(list.totalPages.value, 3);
+  const second = list.goToPage(2);
+  assert.equal(list.loading.value, true);
+  assert.equal(list.loaded.value, true);
+  assert.deepEqual(list.courses.value, [{ id: 1 }]);
+  assert.equal(list.pagination.value, 1);
+  list.goToPage(2);
+  assert.equal(requests.length, 2);
+  const third = list.goToPage(3);
+  requests[2].resolve({ data: [{ id: 3 }], last_page: 3 });
+  await third;
+  requests[1].resolve({ data: [{ id: 2 }], last_page: 3 });
+  await second;
+  assert.deepEqual(list.courses.value, [{ id: 3 }]);
+  assert.equal(list.pagination.value, 3);
+  const failure = list.goToPage(2);
+  requests[3].reject(new Error('offline'));
+  await failure;
+  assert.equal(list.loading.value, false);
+  assert.ok(list.error.value);
+  assert.equal(list.pagination.value, 3);
+  const retry = list.goToPage(2);
+  requests[4].resolve({ data: [], last_page: 3 });
+  await retry;
+  assert.equal(list.error.value, '');
+  assert.deepEqual(list.courses.value, []);
+  scope.stop();
+});
+
+test('failed initial load settles and unmounted requests cannot update state', async () => {
+  let resolve;
+  const scope = effectScope();
+  const list = scope.run(() => useCourseList(() => Promise.reject(new Error('offline'))));
+  await list.fetchCourses();
+  assert.equal(list.loading.value, false);
+  assert.equal(list.loaded.value, false);
+  assert.ok(list.error.value);
+  scope.stop();
+  const secondScope = effectScope();
+  const disposed = secondScope.run(() => useCourseList(() => new Promise(r => { resolve = r; })));
+  const request = disposed.fetchCourses();
+  secondScope.stop();
+  resolve({ data: [{ id: 1 }], last_page: 1 });
+  await request;
+  assert.deepEqual(disposed.courses.value, []);
+});
