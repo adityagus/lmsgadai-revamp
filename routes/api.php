@@ -93,6 +93,8 @@ Route::middleware(['web', 'api'])->group(function () {
 // Report
 Route::middleware(['web', 'api'])->group(function () {
     Route::get('/report/documents', [\App\Http\Controllers\api\DocumentReportController::class, 'getReport']);
+    Route::get('/report/activity-logs', [\App\Http\Controllers\api\DocumentReportController::class, 'getActivityLogs']);
+    Route::post('/report/activity-logs/export-excel', [\App\Http\Controllers\api\DocumentReportController::class, 'exportActivityLogsExcel']);
     Route::post('/report/documents/export-excel', [\App\Http\Controllers\api\DocumentReportController::class, 'exportExcel']);
 });
 

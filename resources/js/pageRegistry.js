@@ -1,4 +1,5 @@
 export default {
+  'landing-page/pages/home': () => import('./pages/landing-page/pages/home.vue'),
   'Admin/AuditLog': () => import('./pages/Admin/AuditLog.vue'),
   'Auth/SignIn': () => import('./pages/Auth/SignIn.vue'),
   'Dashboard': () => import('./pages/Dashboard.vue'),

@@ -1,5 +1,12 @@
 # Revamp status
 
+Landing page update (2026-09-28):
+- Follow-up polish: reduced excess hero/footer spacing, aligned container widths, adjusted mobile section spacing, softened card borders/shadows, and aligned vision/mission cards. Testimonials now use text-only quotes with aligned names and no portrait requests. Production build and focused diff whitespace check passed; browser visual verification remains outstanding.
+- `/` now renders the existing legacy Beladiri home through Inertia, registered in config/pages.php and pageRegistry.js, without the application sidebar. Preserves legacy sections, Poppins, indigo colors, cards, footer and AOS animations.
+- Login/Dashboard follows shared session props. Course requests run only for signed-in users; guests see a login prompt, preserving the protected course-list API. Added loading/error states and request cancellation; replaced the missing course fallback image with the existing LMS logo.
+- Verified: focused public/page-map backend tests 3 passed / 395 assertions (SQLite memory), frontend 26 passed, production Vite build passed (existing large-chunk warning). Browser visual comparison was not run.
+- Wider InertiaPagesTest run: 6 passed, 1 failed (433 assertions). Existing LoginController.php:50 contains `|| true`, so the wrong-password test fails even in isolation. Login code was not changed for this landing task; this remains unresolved.
+
 Target: C:/laragon/www/lmsgadai-revamp. Original application: ../lmsgadai.
 
 User decisions: preserve all features; Laravel 13 + Vue/Inertia/Tailwind; same primary LMS and secondary employee databases; clean UI; project skill and compact context notes.
@@ -28,3 +35,9 @@ Class management and quiz audience update (2026-09-25):
 - quiz_access_rules stores restrictions. Save/update/visibility and duplication preserve rules; students cannot edit rules. Enforcement covers quiz listings, start/resume, attempt reads, answers and submission, including linked course quizzes. Missing employee identity fields fail a configured restriction. Existing attempts/results are retained.
 - Ran ONLY database/migrations/2026_09_25_000002_create_quiz_access_rules.php against shared LMS DB; it creates one new table, without rewriting existing tables/data. Legacy app code remains unchanged; restrictions are enforced by revamp endpoints.
 - Verification: focused backend 27 tests / 361 assertions (SQLite memory), frontend 26 tests, Vite production build passed. Live read-only checks serialized course pages repeatedly and loaded 47 positions / 38 branches. Browser used synthetic data to check class list and quiz editor on desktop/mobile, selection controls, legacy styling and sidebar; no employee account mutations performed.
+
+Document Activity Log Report & Excel Export update (2026-09-28):
+- Added `getActivityLogs` and `exportActivityLogsExcel` endpoints in `DocumentReportController.php` and registered API routes (`GET /api/v1/report/activity-logs` & `POST /api/v1/report/activity-logs/export-excel`).
+- Created PhpSpreadsheet Excel exporter matching exact 15-column format, header styling (gold fill `#FFE699`, bold text, wrap text, center alignment), and cell borders from user screenshot.
+- Optimized performance for large datasets: batching `$batchSize = 2000` rows with `fromArray`, setting explicit column widths (avoiding cell-by-cell length scanning), default sheet fonts, disabling calculation cache via `Calculation::getInstance()`, and removing invalid private property access `$spreadsheet->calculationEngine`.
+- Added "Ekspor Excel Aktivitas" button and export handler in `AuditLog.vue` frontend.

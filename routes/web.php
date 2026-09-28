@@ -4,7 +4,6 @@ use App\Http\Controllers\PageController;
 use Inertia\Inertia;
 
 require __DIR__.'/legacy.php';
-Route::get('/', fn () => redirect(session('auth.user') ? '/overview' : '/sign-in'));
 Route::get('/sign-in', fn () => session('auth.user') ? redirect('/overview') : Inertia::render('Auth/SignIn', ['title' => 'Masuk', 'fullscreen' => true]))->name('login');
 Route::redirect('/lms', '/kelas');
 Route::redirect('/report', '/report/documents');

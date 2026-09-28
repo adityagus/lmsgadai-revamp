@@ -8,22 +8,22 @@
             <link href="./output.css" rel="stylesheet">
             <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap"
                 rel="stylesheet" />
-            <title>Obito Online Learning Platform - Learn Anytime, Anywhere</title>
+            <title>Beladiri - LMS GADAI</title>
             <meta name="description"
-                content="Obito is an innovative online learning platform that empowers students and professionals with high-quality, accessible courses.">
+                content="Beladiri adalah platform pembelajaran online yang dirancang untuk membantu Anda meningkatkan keterampilan dan mencapai tujuan karir.">
 
             <!-- Favicon -->
             <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logos/logo-64.png">
             <link rel="apple-touch-icon" href="assets/images/logos/logo-64.png">
 
             <!-- Open Graph Meta Tags -->
-            <meta property="og:title" content="Obito Online Learning Platform - Learn Anytime, Anywhere">
+            <meta property="og:title" content="Beladiri - LMS GADAI">
             <meta property="og:description"
-                content="Obito is an innovative online learning platform that empowers students and professionals with high-quality, accessible courses.">
+                content="Beladiri adalah platform pembelajaran online yang dirancang untuk membantu Anda meningkatkan keterampilan dan mencapai tujuan karir.">
             <meta property="og:image" content="https://obito-platform.netlify.app/assets/images/logos/logo-64-big.png">
             <meta property="og:url" content="https://obito-platform.netlify.app">
             <meta property="og:type" content="website">
-        </head>
+        </head> 
 
         <body>
 

@@ -31,5 +31,5 @@ createInertiaApp({
     installNavigationGuards();
     app.mount(el);
   },
-  progress:{color:'#662FFF'},
+  progress:false,
 });

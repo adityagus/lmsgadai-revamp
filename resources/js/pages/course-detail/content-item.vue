@@ -6,8 +6,8 @@
         <span class="font-bold text-sm leading-[21px]">{{ props.index }}</span>
       </p>
       <div class="rounded-[20px] bg-[#D9D9D9] overflow-hidden w-full h-full">
-        <div v-if="props.type === 'quiz'" class="w-full h-full flex items-center justify-center bg-purple-50"><img src="/assets/images/icons/quiz-purple.svg" class="w-14 h-14" alt="Quiz"></div>
-        <img v-else :src="`/assets/images/thumbnails/cover-${props.type}.png`" class="w-full h-full object-cover"
+        <!-- <div v-if="props.type === 'quiz'" class="w-full h-full flex items-center justify-center bg-purple-50"><img src="/assets/images/icons/quiz-purple.svg" class="w-14 h-14" alt="Quiz"></div> -->
+        <img :src="`/assets/images/thumbnails/cover-${props.type}.png`" class="w-full h-full object-cover"
           alt="thumbnail" />
       </div>
     </div>
@@ -17,7 +17,7 @@
       </h3>
       <div class="flex items-center gap-5 mt-1 sm:mt-0">
         <div class="flex items-center gap-[6px] mt-[6px]">
-          <img :src="props.type === 'quiz' ? '/assets/images/icons/quiz-purple.svg' : '/assets/images/icons/note-favorite-purple.svg'" class="w-4 h-4 sm:w-5 sm:h-5" alt="" />
+          <img src='/assets/images/icons/note-favorite-purple.svg' class="w-4 h-4 sm:w-5 sm:h-5" alt="" />
           <p class="text-[#838C9D] text-xs sm:text-sm font-medium capitalize">{{ contentKind === 'google_form' ? 'Google Form' : contentKind === 'quiz' ? 'Quiz' : contentKind }}</p>
         </div>
       </div>

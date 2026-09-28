@@ -17,7 +17,8 @@ class InertiaPagesTest extends TestCase
 
     public function test_sign_in_is_a_public_inertia_page(): void
     {
-        $this->get('/')->assertRedirect('/sign-in');
+        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('landing-page/pages/home', false)->where('fullscreen', true)->where('auth', null));
         $this->get('/sign-in')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Auth/SignIn', false)->where('fullscreen', true));
         $this->get('/overview')->assertRedirect('/sign-in');
         $this->getJson('/api/courses')->assertUnauthorized();

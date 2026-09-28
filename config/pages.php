@@ -1,6 +1,7 @@
 <?php
 // URI, route name, Vue page, title, access, fullscreen
 return [
+    ['/', 'landingpage', 'landing-page/pages/home', 'Beladiri - Belajar Mandiri', null, true],
     ['overview', 'overview', 'Dashboard', 'Ringkasan', null, false],
     ['kelas', 'lms', 'courses/index', 'Kelola kelas', 'manager', false],
     ['courses/create', 'coursesCreate', 'course-create/index', 'Buat kelas', 'manager', false],
