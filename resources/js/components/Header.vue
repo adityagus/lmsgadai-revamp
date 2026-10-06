@@ -230,8 +230,9 @@
 import { ref, nextTick, onMounted } from 'vue';
 import { useRoute, useRouter } from '@/navigation';
 import { usePage, router as inertiaRouter } from '@inertiajs/vue3';
-import { getSession, signOut } from '@/services/authService';
-import { searchContent } from '@/services/courseService';
+import { getSession } from '@/services/queries/authQuery.ts';
+import { signOut } from '@/services/mutations/authMutation.ts';
+import { searchContent } from '@/services/queries/courseQuery.ts';
 import openModalPdf from './openModalPDF.vue'
 import Swal from 'sweetalert2';
 

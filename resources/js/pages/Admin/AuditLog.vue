@@ -1,6 +1,6 @@
 <template>
   <div class="p-0 w-full min-h-screen bg-gray-50">
-    <div class="w-full max-w-6xl mx-auto py-8 px-4">
+    <div class="w-full min-w-0 mx-auto py-4">
 
       <!-- Header Section -->
       <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
@@ -95,7 +95,6 @@
 
           <!-- Rows count selector -->
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 font-semibold">Tampilkan:</span>
             <select v-model="perPage"
               class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition cursor-pointer">
               <option :value="5">5 baris</option>
@@ -104,10 +103,8 @@
               <option :value="50">50 baris</option>
             </select>
           </div>
-
           <!-- Sort filter selector -->
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 font-semibold">Urutkan:</span>
             <select v-model="sortBy"
               class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition cursor-pointer">
               <option value="newest">Terbaru</option>
@@ -125,18 +122,18 @@
       <!-- Stats Table Card -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[700px] border-collapse">
+          <table class="w-full min-w-[760px] table-fixed border-collapse" :aria-busy="loading">
             <thead>
               <tr
                 class="bg-gray-50 border-b border-gray-100 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 <th class="py-4 px-6 w-16 text-center">No</th>
                 <th class="py-4 px-6">Informasi Dokumen</th>
-                <th class="py-4 px-6 text-center">Sudah Dibaca</th>
-                <th class="py-4 px-6 text-center">Total Klik</th>
-                <th class="py-4 px-6 text-center w-52">Aksi</th>
+                <th class="py-4 px-4 text-center w-36">Sudah Dibaca</th>
+                <th class="py-4 px-4 text-center w-28">Total Klik</th>
+                <th class="py-4 px-4 text-center w-56">Aksi</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 align-middle">
               <!-- Loading Skeleton Rows -->
               <template v-if="loading">
                 <tr v-for="i in perPage" :key="'skeleton-' + i" class="animate-pulse">
@@ -159,14 +156,21 @@
                 </tr>
               </template>
 
+              <tr v-else-if="error">
+                <td colspan="5" class="px-6 py-10 text-center">
+                  <p role="alert" class="text-sm text-red-600">{{ error }}</p>
+                  <button type="button" @click="fetchStats" class="mt-3 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">Coba lagi</button>
+                </td>
+              </tr>
+
               <!-- Real Data Rows -->
               <template v-else-if="paginatedStats.length > 0">
                 <tr v-for="(item, idx) in paginatedStats" :key="item.document_id"
                   class="hover:bg-gray-50/50 transition">
                   <td class="py-4 px-6 text-center text-sm font-medium text-gray-500">{{ startRow + idx }}</td>
                   <td class="py-4 px-6">
-                    <div class="font-semibold text-gray-900 text-sm">{{ item.document_title }}</div>
-                    <div class="text-xs text-gray-400 mt-0.5">No. Surat: {{ item.document_no_surat || '-' }}</div>
+                    <div class="font-semibold text-gray-900 text-sm break-words">{{ item.document_title }}</div>
+                    <div class="text-xs text-gray-400 mt-0.5 break-words">No. Surat: {{ item.document_no_surat || '-' }}</div>
                   </td>
                   <td class="py-4 px-6 text-center">
                     <span
@@ -182,8 +186,8 @@
                   </td>
                   <td class="py-4 px-6 text-center">
                     <button @click="showDetail(item)"
-                      class="inline-flex items-center px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition duration-150 gap-1.5 border border-indigo-100">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      class="inline-flex items-center whitespace-nowrap px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition duration-150 gap-1.5 border border-indigo-100">
+                      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                       </svg>
@@ -209,7 +213,7 @@
         </div>
 
         <!-- Table Footer: Pagination controls and rows description -->
-        <div v-if="sortedStats.length > 0"
+        <div v-if="!loading && !error && sortedStats.length > 0"
           class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="text-xs text-gray-500 font-medium">
             Menampilkan {{ startRow }} - {{ endRow }} dari {{ sortedStats.length }} dokumen
@@ -242,10 +246,6 @@
 
       </div>
 
-      <div v-if="error"
-        class="mt-8 p-4 bg-red-50 border border-red-100 text-red-600 text-center rounded-xl font-medium">
-        {{ error }}
-      </div>
 
     </div>
 
@@ -273,11 +273,11 @@
         <div class="px-6 border-b border-gray-100 flex gap-4 bg-gray-50/20">
           <button @click="activeTab = 'unviewed'"
             :class="['py-3 text-sm font-semibold border-b-2 px-1 transition duration-150', activeTab === 'unviewed' ? 'border-amber-500 text-amber-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
-            Belum Membaca ({{ unviewedUsersList.length }})
+            Belum Baca ({{ unviewedUsersList.length }})
           </button>
           <button @click="activeTab = 'viewed'"
             :class="['py-3 text-sm font-semibold border-b-2 px-1 transition duration-150', activeTab === 'viewed' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
-            Sudah Membaca ({{ viewedUsersList.length }})
+            Sudah Baca ({{ viewedUsersList.length }})
           </button>
         </div>
 
@@ -402,8 +402,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import axios from 'axios';
-import { getDocumentViewStats, getUnviewedUsers, getViewedUsers } from '../../services/documentViewService';
+import { exportActivityLogs } from '@/services/mutations/reportMutation.ts';
+import { getDocumentViewStats, getUnviewedUsers, getViewedUsers } from '@/services/queries/documentViewQuery.ts';
 
 const stats = ref([]);
 const loading = ref(false);
@@ -435,7 +435,7 @@ const fetchStats = async () => {
   error.value = '';
   try {
     const res = await getDocumentViewStats();
-    if (res && res.success) {
+    if (res?.success && Array.isArray(res.data)) {
       stats.value = res.data;
     } else {
       error.value = 'Gagal memuat statistik log audit.';
@@ -482,7 +482,6 @@ const sortedStats = computed(() => {
     return items.sort((a, b) => a.total_clicks - b.total_clicks);
   }
   if (sortBy.value === 'newest') {
-    console.log(items);
     return items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
   if (sortBy.value === 'oldest') {
@@ -501,6 +500,10 @@ const paginatedStats = computed(() => {
 // Pagination Info Computeds
 const totalPages = computed(() => {
   return Math.ceil(sortedStats.value.length / perPage.value) || 1;
+});
+
+watch(totalPages, (pages) => {
+  currentPage.value = Math.min(currentPage.value, pages);
 });
 
 const startRow = computed(() => {
@@ -609,9 +612,7 @@ const exportToExcel = async () => {
   if (exporting.value) return;
   try {
     exporting.value = true;
-    const response = await axios.post('/api/v1/report/activity-logs/export-excel', {}, {
-      responseType: 'blob'
-    });
+    const response = await exportActivityLogs();
 
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");

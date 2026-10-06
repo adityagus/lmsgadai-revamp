@@ -146,7 +146,7 @@
               }}</span></div>
           <!-- Tombol aksi di tengah bawah -->
           <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4 mt-2 justify-center items-center w-max"
-            v-if='auth && (auth.idgrup == "JBT-032" || auth.idgrup === "JBT-037" || auth.idgrup === "JBT-039" || auth.idgrup === "JBT-040")'>
+            v-if="canManageDocuments">
             <router-link :to="{ name: 'information-document-update', params: { id: item.id } }" @click.stop
               class="bg-white rounded-full px-4 py-2 shadow hover:bg-purple-100 transition group/edit flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -208,16 +208,15 @@
 </template>
 
 <script setup>
-import axios from 'axios';
-import { softDeleteAnnouncement } from '@/services/announcementService';
+import { softDeleteAnnouncement } from '@/services/mutations/announcementMutation.ts';
 import OpenModalPDF from '@/components/openModalPDF.vue';
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from '@/navigation'
 import Vue3Datatable from '@bhplugin/vue3-datatable';
-import { getDetailAnnouncement, getLastDocumentPreview } from '@/services/announcementService';
-import { getSession } from '@/services/authService';
-import { getWilayah } from '@/services/masterService';
-import { recordDocumentView } from '@/services/documentViewService';
+import { getDetailAnnouncement, getLastDocumentPreview } from '@/services/queries/announcementQuery.ts';
+import { getSession } from '@/services/queries/authQuery.ts';
+import { getWilayah } from '@/services/queries/masterQuery.ts';
+import { recordDocumentView } from '@/services/mutations/documentViewMutation.ts';
 import Swal from 'sweetalert2';
 
 const route = useRoute();
@@ -299,11 +298,12 @@ const search = ref('');
 const isAdmin = computed(() =>
   auth.value &&
   (
-    auth.value.idgrup == 'JBT-032' ||
-    auth.value.idgrup === 'JBT-037' ||
-    auth.value.idgrup === 'JBT-039' ||
-    auth.value.idgrup === 'JBT-040'
+    ['admin', 'sop'].includes(auth.value.role)
   )
+);
+
+const canManageDocuments = computed(() =>
+  isAdmin.value && !['JBT-019', 'JBT-020', '042', 'JBT-TRAINER'].includes(auth.value?.idgrup)
 );
 
 const tableCols = computed(() => {

@@ -38,7 +38,7 @@
     <div class="grid grid-cols-2 gap-3 sm:gap-5 w-full">
       <div class="flex flex-col rounded-[20px] border border-[#CFDBEF] p-4 sm:p-5 gap-2 sm:gap-4">
         <img src="/assets/images/icons/profile-2user-purple.svg" class="w-6 h-6 sm:w-8 sm:h-8" alt="icon" />
-        <p class="font-semibold text-xs sm:text-base"> 0 Students</p>
+        <p class="font-semibold text-xs sm:text-base" aria-live="polite">{{ totalStudents }} Students</p>
       </div>
       <div class="flex flex-col rounded-[20px] border border-[#CFDBEF] p-4 sm:p-5 gap-2 sm:gap-4">
         <img src="/assets/images/icons/crown-purple.svg" class="w-6 h-6 sm:w-8 sm:h-8" alt="icon" />
@@ -54,17 +54,21 @@
       </div>
     </div>
   </section>
+  <CourseParticipants v-if="course.id" :key="course.id" :course-id="course.id" @total-students="totalStudents = $event" />
   <TableContentPage :contents="contents" :courseId="course.id" />
 </template>
 
 <script setup>
 import { RouterLink, useRoute } from '@/navigation';
 import TableContentPage from './table-content.vue';
-import { getCourseByIdPagination } from '@/services/courseService';
+import CourseParticipants from './CourseParticipants.vue';
+import { getCourseByIdPagination } from '@/services/queries/courseQuery.ts';
 import { onMounted, ref, reactive } from 'vue';
 import { useForm } from 'vee-validate';
 import { mutateContentSchema } from '@/utils/zodSchema';
 import AnimatedPlaceholder from '@/components/AnimatedPlaceholder.vue';
+
+import "primeicons/primeicons.css";
 
 // interface Props {
 //   id: number
@@ -79,8 +83,8 @@ const { handleSubmit, isSubmitting, values, errors } = useForm({
 });
 const route = useRoute();
 
-
 const course = ref({});
+const totalStudents = ref(null);
 const contents = ref({});
 const props = defineProps({
   id: {

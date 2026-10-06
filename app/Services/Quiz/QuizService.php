@@ -19,9 +19,7 @@ class QuizService
             'updated_at' => now(),
         ]);
         $user = DB::table('lms_users')->where('username', $username)->first();
-        if (in_array($request->session()->get('auth.idgrup'), config('quiz.admin_positions'), true)) {
-            $user->role = 'admin';
-        }
+        $user->role = app(\App\Services\LmsAccess::class)->role($request);
         $user->position = $request->session()->get('auth.idgrup');
         $user->branch = $request->session()->get('auth.cabang');
         return $user;
@@ -69,7 +67,6 @@ class QuizService
 
     public function assigned($quiz, $user)
     {
-        if (!app(QuizAudience::class)->allows($quiz->id, $user)) return false;
         $student = $user->id;
         // Courses currently have no enrolment restriction: every signed-in LMS user can open them.
         // A linked quiz follows that same audience; legacy standalone quizzes keep their assignments.
@@ -77,8 +74,10 @@ class QuizService
             return DB::table('courses')->where('id', $quiz->course_id)->exists()
                 && DB::getSchemaBuilder()->hasTable('course_details')
                 && DB::table('course_details')->where('course_id', $quiz->course_id)->where('quiz_id', $quiz->id)->where('type', 'quiz')->exists()
+                && app(\App\Services\CourseAudience::class)->allows((int) $quiz->course_id, request())
                 && DB::table('lms_users')->where('id', $student)->exists();
         }
+        if (!app(QuizAudience::class)->allows($quiz->id, $user)) return false;
         return DB::table('quiz_students')->where('quiz_id', $quiz->id)->where('student_id', $student)->exists()
             || DB::table('quiz_classes')->join('class_students', 'class_students.class_id', '=', 'quiz_classes.class_id')
                 ->where('quiz_id', $quiz->id)->where('student_id', $student)->exists();
@@ -134,7 +133,12 @@ class QuizService
             $this->manage($user, $this->quiz($attempt->quiz_id));
         } else {
             abort_unless($attempt->student_id === $user->id, 403);
-            abort_unless(app(QuizAudience::class)->allows($attempt->quiz_id, $user), 403, 'Anda tidak termasuk peserta yang diizinkan mengakses kuis ini.');
+            $quiz = $this->quiz($attempt->quiz_id);
+            abort_unless($quiz->course_id
+                ? app(\App\Services\CourseAudience::class)->allows((int) $quiz->course_id, request())
+                : app(QuizAudience::class)->allows($attempt->quiz_id, $user),
+                403,
+                'Anda tidak termasuk peserta yang diizinkan mengakses kuis ini.');
         }
         $this->expire($id);
         return DB::table('quiz_attempts')->find($id);

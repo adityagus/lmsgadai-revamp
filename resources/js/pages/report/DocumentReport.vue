@@ -159,7 +159,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import axios from 'axios';
+import { getDocumentReport } from '@/services/queries/reportQuery.ts';
+import { exportDocumentReport } from '@/services/mutations/reportMutation.ts';
 
 const data = ref([]);
 const loading = ref(false);
@@ -178,7 +179,7 @@ const fetchReport = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const response = await axios.get('/api/v1/report/documents');
+    const response = await getDocumentReport();
     if (response.data && response.data.success) {
       data.value = response.data.data;
     } else {
@@ -248,11 +249,7 @@ const exportToExcel = async () => {
   if (filteredData.value.length === 0 || exporting.value) return;
   try {
     exporting.value = true;
-    const response = await axios.post('/api/v1/report/documents/export-excel', {
-      data: filteredData.value
-    }, {
-      responseType: 'blob'
-    });
+    const response = await exportDocumentReport(filteredData.value);
 
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");

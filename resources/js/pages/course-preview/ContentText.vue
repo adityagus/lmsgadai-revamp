@@ -28,7 +28,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUpdated, defineProps } from 'vue';
-import { getSession } from '@/services/authService';
+import { getSession } from '@/services/queries/authQuery.ts';
 import { downloadWatermarkedPdf } from '@/utils/pdfWatermark';
 
 const props = defineProps({
@@ -87,6 +87,15 @@ function replaceOembedWithIframe() {
         iframe.allowFullscreen = true;
         el.parentNode.replaceChild(iframe, el);
       }
+    } else if (url && /^(https?:\/\/)?(player\.vimeo\.com|docs\.google\.com\/forms|forms\.gle|www\.canva\.com\/design)/i.test(url)) {
+      const iframe = document.createElement('iframe');
+      iframe.src = url;
+      iframe.style.width = '100%';
+      iframe.style.minHeight = '560px';
+      iframe.style.border = '0';
+      iframe.loading = 'lazy';
+      iframe.allowFullscreen = true;
+      el.parentNode.replaceChild(iframe, el);
     }
   });
 }

@@ -12,7 +12,7 @@
     <p v-if="message" class="success" role="status">{{ message }}</p>
     <p v-if="loading" class="panel empty">Memuat quiz...</p>
     <template v-else-if="meta">
-      <p v-if="form.has_attempts" class="quiz-notice">Quiz sudah pernah dikerjakan. Soal, jadwal, dan course dikunci untuk menjaga riwayat nilai. Pembahasan soal, jumlah kesempatan, tampilan hasil, dan pengaturan peserta khusus tetap bisa diubah.</p>
+      <p v-if="form.has_attempts" class="quiz-notice">Quiz sudah pernah dikerjakan. Soal, jadwal, dan course dikunci untuk menjaga riwayat nilai. Pembahasan soal, jumlah kesempatan, dan tampilan hasil tetap bisa diubah.</p>
 
       <section class="quick-card stack" aria-labelledby="quiz-information">
         <div class="row quiz-section-heading"><h2 id="quiz-information">Informasi Quiz</h2><span class="badge">{{ statusLabel }}</span></div>
@@ -20,17 +20,16 @@
           <label class="field">Judul Quiz<input v-model="form.title" maxlength="150" placeholder="Contoh: K3 atau Produk Gadai" required><small class="muted">Maksimal 150 karakter.</small></label>
           <div class="form-grid">
             <label class="field">Durasi pengerjaan (menit)<input v-model.number="form.duration_minutes" type="number" min="1" max="1440" required></label>
-            <label class="field">Nilai minimal untuk lulus<input v-model.number="form.passing_grade" type="number" :min="totalQuestionWeight" max="100" step="0.01" :aria-invalid="!!gradeError"><small class="muted">Total bobot: {{ totalQuestionWeight }} poin. Nilai lulus harus minimal {{ totalQuestionWeight }} dan maksimal 100.</small><small v-if="gradeError" class="error" role="alert">{{ gradeError }}</small></label>
+            <label class="field">Nilai minimal untuk lulus<input v-model.number="form.passing_grade" type="number" min="0" :max="Math.min(100, totalQuestionWeight)" step="0.01" :aria-invalid="!!gradeError"><small class="muted">Total bobot: {{ totalQuestionWeight }} poin. Nilai minimal lulus tidak boleh melebihi total bobot pertanyaan.</small><small v-if="gradeError" class="error" role="alert">{{ gradeError }}</small></label>
           </div>
           <label class="field">Course
             <select v-model="form.course_id" :disabled="embedded || form.course_locked" required>
               <option :value="null" disabled>Pilih satu course</option>
               <option v-for="c in meta.courses" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
-            <small class="muted">Satu quiz hanya terhubung ke satu course. Akses peserta mengikuti course dan pembatasan akses di bawah.</small>
+            <small class="muted">Akses quiz mengikuti kelas. Tambahkan peserta khusus melalui halaman detail kelas.</small>
           </label>
         </fieldset>
-        <QuizAudience v-model="form.audience" :disabled="busy" />
         <label class="field quiz-attempt-field">Jumlah kesempatan mengerjakan<input v-model.number="form.maximum_attempt" :disabled="busy" type="number" min="0" max="100"><small class="muted">Jumlah Kesempatan Percobaan Pengerjaan. Tulis 0 jika tanpa batas</small></label>
         <label class="check"><input v-model="form.no_schedule" type="checkbox" :disabled="busy || form.has_attempts" @change="form.no_schedule && (form.release_after_close = false)">Tanpa batas tanggal pengerjaan</label>
         <p v-if="form.no_schedule" class="muted">Quiz dapat dikerjakan kapan saja setelah diterbitkan. Durasi dan batas kesempatan tetap berlaku.</p>
@@ -54,21 +53,6 @@
               <div class="form-grid"><label v-for="setting in resultSettings" :key="setting.key" class="check"><input v-model="form[setting.key]" type="checkbox" :disabled="form.no_schedule && setting.key === 'release_after_close'">{{ setting.label }}</label></div>
               <label v-if="form.status !== 'DRAFT'" class="field">Status Quiz<select v-model="form.status"><option value="PUBLISHED">Diterbitkan</option><option value="CLOSED">Ditutup</option></select><small class="muted">Quiz yang ditutup tidak dapat dimulai lagi. Pengerjaan yang sedang berjalan tetap mengikuti batas waktunya.</small></label>
             </fieldset>
-            <section class="stack">
-              <div><h3>Peserta Khusus</h3><p class="muted">Atur waktu atau kesempatan berbeda untuk peserta course ini. Kolom kosong mengikuti pengaturan quiz.</p></div>
-              <article v-for="(o,index) in form.overrides" :key="index" class="panel stack">
-                <fieldset :disabled="busy || modalBusy" class="quiz-fieldset form-grid">
-                  <label class="field">Peserta<select v-model="o.student_id" :disabled="form.has_attempts && !!o.persisted"><option value="">Pilih peserta</option><option v-for="s in meta.students" :key="s.id" :value="s.id">{{ s.name }} ({{ s.username }})</option></select></label>
-                  <label class="field">Tambahan waktu (menit)<input v-model.number="o.additional_minutes" type="number" min="0" max="1440"></label>
-                  <label class="field">Jumlah kesempatan<input v-model="o.maximum_attempt" type="number" min="0" max="100" placeholder="Ikuti pengaturan quiz"></label>
-                  <label class="field">Mulai tersedia<input v-model="o.available_from" type="datetime-local"></label>
-                  <label class="field">Batas akhir pengerjaan<input v-model="o.available_until" type="datetime-local"></label>
-                </fieldset>
-                <button v-if="form.has_attempts" type="button" :disabled="busy || modalBusy" @click="saveOverride(o)">Simpan Pengaturan Peserta</button>
-                <button v-else type="button" :disabled="busy" @click="form.overrides.splice(index,1)">Hapus Peserta Khusus</button>
-              </article>
-              <button type="button" :disabled="busy" @click="form.overrides.push(newOverride())">Tambah Peserta Khusus</button>
-            </section>
           </div>
         </details>
       </section>
@@ -78,8 +62,7 @@
         <div v-if="!form.has_attempts" class="row">
           <button type="button" class="primary" :disabled="busy" @click="openQuestion()">Tambah Soal</button>
           <button type="button" :disabled="busy" @click="openModal('bank')">Pilih dari Bank Soal</button>
-          <button type="button" :disabled="busy" @click="openModal('generate')">Ambil Soal Acak</button>
-          <button type="button" :disabled="busy" @click="openModal('bulk')">Tambah Banyak Soal</button>
+          <button type="button" :disabled="busy" @click="openModal('bulk')">Bulk Soal</button>
         </div>
         <p v-if="!quizQuestions.length" class="quiz-empty">Belum ada soal. Buat soal baru atau pilih dari bank soal.</p>
         <article v-for="(q,index) in quizQuestions" :key="q.id" class="question-card-item stack">
@@ -157,7 +140,7 @@
       </template>
       <template v-else-if="modal === 'publish'">
         <p class="muted">Quiz <strong>{{ form.title }}</strong> dapat dikerjakan melalui course yang dipilih sesuai jadwal.</p>
-        <p class="quiz-summary">{{ form.question_count }} soal · {{ form.duration_minutes }} menit · {{ selectedCourseName }}<span v-if="form.overrides.length"> · {{ form.overrides.length }} peserta khusus</span></p>
+        <p class="quiz-summary">{{ form.question_count }} soal · {{ form.duration_minutes }} menit · {{ selectedCourseName }}</p>
         <div class="row quiz-modal-actions"><button type="button" :disabled="busy" @click="closeModal">Batal</button><button type="button" class="primary" :disabled="busy" @click="saveManual('PUBLISHED')">{{ busy ? 'Menerbitkan...' : 'Terbitkan' }}</button></div>
       </template>
     </QuizDialog>
@@ -165,7 +148,6 @@
 </template>
 
 <script setup>
-import QuizAudience from "./QuizAudience.vue";
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from '@/navigation';
 import { api, errorMessage, localInput, isoDate, dateLabel } from './api';
@@ -185,11 +167,10 @@ const loading = ref(true), busy = ref(false), modalBusy = ref(false), saveStatus
 const modal = ref(''), modalError = ref('');
 const form = ref({
   title:'', description:'', course_id:Number(props.courseId || route.query.course_id) || null,
-  duration_minutes:45, passing_grade:75, maximum_attempt:1, grading_method:'highest', question_count:1,
+  duration_minutes:45, passing_grade:0, maximum_attempt:1, grading_method:'highest', question_count:1,
   no_schedule:false, available_from:localInput(new Date().toISOString()), available_until:localInput(new Date(Date.now()+30*86400000).toISOString()),
   status:'DRAFT', randomize_question:true, randomize_answer:false,
   show_score:true, show_correct_answer:false, show_wrong_answer:false, show_explanation:false, show_total_correct:true, show_passing_status:true, release_after_close:false,
-  audience:{positions:[],branches:[]},
   class_ids:[], question_ids:[], overrides:[], has_attempts:false,
 });
 const resultSettings = [
@@ -216,7 +197,6 @@ const bulkExample = '1. Barang yang dapat dijadikan jaminan gadai adalah?\nA. Em
 const bulkPreview = computed(() => parseBulkQuestions(bulkText.value));
 const filteredBankQuestions = computed(() => allQuestions.value.filter(q => (!bankFilter.value || Number(q.bank_id)===Number(bankFilter.value)) && `${q.question} ${q.category || ''}`.toLowerCase().includes(questionSearch.value.trim().toLowerCase())));
 const modalTitle = computed(() => ({question:editingQuestionIndex.value===null?'Tambah Soal':'Edit Soal',bank:'Pilih dari Bank Soal',generate:'Ambil Soal Acak',bulk:'Tambah Banyak Soal',publish:'Terbitkan quiz ini sekarang?'})[modal.value]);
-const newOverride = () => ({student_id:'',additional_minutes:0,maximum_attempt:'',available_from:'',available_until:''});
 const serializeOverride = o => ({student_id:Number(o.student_id),additional_minutes:Number(o.additional_minutes),maximum_attempt:o.maximum_attempt==='' || o.maximum_attempt==null?null:Number(o.maximum_attempt),available_from:isoDate(o.available_from),available_until:isoDate(o.available_until)});
 const draftStorageKey = () => `quiz-draft:${meta.value.user.id}:${props.courseId || route.query.course_id || 'general'}`;
 function rememberDraft(value) { try { value ? sessionStorage.setItem(draftStorageKey(),String(value)) : sessionStorage.removeItem(draftStorageKey()); } catch {} }
@@ -241,9 +221,10 @@ async function persist(status) {
   const issue=validation(status); if (issue) throw new Error(issue);
   const version=revision;
   const payload={...form.value,class_ids:[],title:form.value.title.trim(),status,available_from:form.value.no_schedule?null:isoDate(form.value.available_from),available_until:form.value.no_schedule?null:isoDate(form.value.available_until),overrides:form.value.overrides.map(serializeOverride)};
+  delete payload.audience;
   saveStatus.value='saving';
   if (form.value.has_attempts) {
-    const settings={status,maximum_attempt:form.value.maximum_attempt,overrides:payload.overrides,audience:payload.audience};
+    const settings={status,maximum_attempt:form.value.maximum_attempt};
     resultSettings.forEach(s => settings[s.key]=form.value[s.key]);
     await api('patch',`manage/${id.value}/visibility`,settings);
   } else {
@@ -292,11 +273,6 @@ async function leaveEditor() {
   if ((revision!==savedRevision || explanationDirty.value.size) && !(await saveManual(form.value.status,false))) return;
   rememberDraft(null);
   if (embedded.value) emit('cancel'); else router.push(form.value.course_id ? '/kelas/'+form.value.course_id : '/kelas');
-}
-async function saveOverride(o) {
-  modalBusy.value=true; error.value='';
-  try { await api('post',`manage/${id.value}/overrides`,serializeOverride(o)); o.persisted=true; message.value='Pengaturan peserta disimpan untuk pengerjaan berikutnya.'; }
-  catch(e) { showError(failureMessage(e)); } finally { modalBusy.value=false; }
 }
 function openModal(name) { modalError.value=''; modal.value=name; if(name==='bank') bankSelection.value=[]; }
 function closeModal() { if(!busy.value && !modalBusy.value) { modal.value=''; modalError.value=''; } }

@@ -67,6 +67,10 @@
       <div class="flex-1 h-10 bg-gray-200 rounded-lg"></div>
     </div>
   </div>
+  <div v-else-if="loadError" role="alert" class="bg-white rounded-xl p-8 mt-8">
+    <p class="text-red-600">{{ loadError }}</p>
+    <button type="button" class="mt-4 text-sidebar font-semibold" @click="loadForm">Coba lagi</button>
+  </div>
   <div class="w-full bg-white rounded-xl shadow-lg p-4 sm:p-8 mt-4 sm:mt-8" v-else>
     <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-sidebar">{{ isEditMode ? 'Edit' : 'Create' }} {{ name }}</h1>
     <div class="flex items-center mb-6 justify-center overflow-x-auto pb-2 scrollbar-hidden max-w-full">
@@ -130,33 +134,28 @@
         <div class="flex flex-col gap-[10px]" v-if='type === "text"'>
           <label class="font-semibold text-xs sm:text-sm">Content</label>
           <div class="overflow-x-auto max-w-full">
-            <ckeditor :editor="ClassicEditor" v-model="content" :config="editorConfig" @change="() => {
-              const data = editor.getData();
-              console.log('data adalah', data);
-              content.value = data;
-              console.log('Editor content changed:', content);
-            }" />
+            <ckeditor :editor="ClassicEditor" v-model="content" :config="editorConfig" />
           </div>
 
           <span class="error-message text-[#FF435A] text-xs">
-            {{ errors?.text }}
+            {{ errors?.content }}
           </span>
         </div>
-        <div>
+        <div v-if="type === 'pdf'">
           <!-- Input file baru -->
           <div class="mb-4">
             <label class="block text-xs sm:text-sm font-semibold mb-1" for="file">
               Upload File PDF <span class="text-red-500">*</span>
             </label>
             <input id="file" type="file" accept="application/pdf" @change="onFileChange"
-              class="w-full border rounded px-3 py-2 text-xs sm:text-sm focus:outline-sidebar" :class="{ 'border-red-500': errors.file }"
+              class="w-full border rounded px-3 py-2 text-xs sm:text-sm focus:outline-sidebar" :class="{ 'border-red-500': errors.dokumen }"
               :required="!isEditMode" />
             <span class='text-xs text-gray-500'>(Max. File size: {{ MAX_FILE_SIZE_MB }} MB)</span>
             <small class="block text-gray-500 text-xs" v-if='isEditMode'>
               Boleh dikosongkan jika tidak ingin mengganti file
             </small>
-            <span v-if="errors.file" class="text-xs text-red-500 mt-1 block">
-              {{ errors.file }}
+            <span v-if="errors.dokumen" class="text-xs text-red-500 mt-1 block">
+              {{ errors.dokumen }}
             </span>
             <span v-if="fileName" class="text-xs text-gray-500 mt-1 block">
               File: {{ fileName }}
@@ -206,7 +205,7 @@
           class="w-full sm:flex-1 py-2.5 sm:py-2 text-xs sm:text-sm rounded bg-sidebar text-white font-semibold hover:bg-purple-700 disabled:opacity-50 transition cursor-pointer">
           Selanjutnya
         </button>
-        <button v-if="step === 3" type="submit" :disabled="isSubmitting"
+        <button v-if="step === 3" type="submit" :disabled="isSubmitting || !kd_jabatan.length"
           class="w-full sm:flex-1 py-2.5 sm:py-2 text-xs sm:text-sm rounded bg-sidebar text-white font-semibold hover:bg-purple-700 disabled:opacity-50 transition cursor-pointer">
           <span v-if='!isSubmitting'>{{ isEditMode ? 'Update' : 'Simpan' }}</span>
           <div class="loader justify-items-center" v-if="isSubmitting">
@@ -229,17 +228,16 @@
 
 <script setup>
 import CKEditor from '@ckeditor/ckeditor5-vue';
-import * as ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from '@/navigation'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { AnnouncementInfoSchema } from '@/utils/zodSchema'
-import { createAnnouncement, updateAnnouncement, wizardSession, wizardStep, finishWizard, getDocumentById } from '@/services/announcementService'
-import { getWilayah, getTypesByIdMenu, getJabatan, getCabang } from '@/services/masterService';
+import { createAnnouncement, updateAnnouncement } from '@/services/mutations/announcementMutation.ts';
+import { getDocumentById } from '@/services/queries/announcementQuery.ts';
+import { getTypesByIdMenu, getJabatan, getCabang } from '@/services/queries/masterQuery.ts';
 import AreaCheckbox from '@/components/AreaCheckbox.vue'
-import axios from 'axios'
-import { result } from 'lodash'
 import Swal from 'sweetalert2'
 // Select All Jabatan logic
 import { computed } from 'vue';
@@ -247,18 +245,13 @@ import { computed } from 'vue';
 
 
 const [route, router] = [useRoute(), useRouter()];
-console.log("route", route);
 const name = ref('');
 const announcementId = route.params.id; // For update mode
-console.log("announcementId:", announcementId);
 const isEditMode = ref(!!announcementId);
-console.log("isEditMode:", isEditMode);
 
-const createType = ref(null); // default 1 kalau gak ada
-console.log("Category create from route:", createType);
+const createType = ref(Number(route.query.type) || 1); // default 1 kalau gak ada
 
 watch(createType, (newVal) => {
-  console.log('newval', newVal);
   if (newVal == 1) {
     name.value = 'Pengumuman';
   } else if (newVal == 2) {
@@ -268,12 +261,11 @@ watch(createType, (newVal) => {
   } else {
     name.value = '';
   }
-});
+}, { immediate: true });
 
 
-const regionals_arr = [];
 const step = ref(1)
-const stepLabels = [name, 'Wilayah', 'Jabatan']
+const stepLabels = computed(() => [name.value, 'Wilayah', 'Jabatan'])
 const daftarJabatan = ref([]);
 const urlThumbnail = ref('');
 const ckeditor = CKEditor.component
@@ -292,16 +284,22 @@ const editorConfig = {
     "mediaEmbed",
     "|",
     "bulletedList",
-    "numberedList",
+  "numberedList",
     "indent",
     "outdent",
   ],
-  initialData: content == null ? "" : content,
+  mediaEmbed: {
+    previewsInData: true,
+    providers: [{
+      name: 'canva',
+      url: /^https?:\/\/(?:www\.)?canva\.com\/design\/[\w-]+\/view(?:\?.*)?$/i,
+      html: match => `<iframe src="${match[0]}${match[0].includes('?') ? '&' : '?'}embed=true" loading="lazy" allowfullscreen></iframe>`,
+    }],
+  },
 };
 
 
 const canProceedStep = computed(() => {
-  console.log('errors', errors.title);
   if (step.value === 1) {
     return (
       title.value &&
@@ -315,7 +313,7 @@ const canProceedStep = computed(() => {
       !errors.value.tgl_berlaku &&
       !errors.value.submenu_id &&
       !errors.value.type &&
-      (type.value !== 'pdf' || !errors.file)
+      (type.value !== 'pdf' || !errors.value.dokumen)
     );
   }
   if (step.value === 2) {
@@ -335,7 +333,7 @@ const nextStep = async function () {
   //   payload = { kd_jabatan: kd_jabatan.value };
   // }
   // await wizardStep(step.value, payload);
-  if (step.value < 3) step.value++;
+  if (canProceedStep.value && step.value < 3) step.value++;
 }
 
 const fnBack = () => {
@@ -398,7 +396,6 @@ function toggleAllCabang(e) {
 const loadContentData = async () => {
   const data = await getDocumentById(announcementId);
   const result = data.data
-  console.log('Loaded document data:', result);
 
   title.value = result.title;
   no_surat.value = result.no_surat;
@@ -432,7 +429,6 @@ const loadContentData = async () => {
   content.value = result.content;
   type.value = result.type;
 
-  console.log("regionals_id", regionals_id.value, kd_jabatan.value);
 
   // Set createType and name label based on loaded document's menu
   createType.value = result.menu.id_menu;
@@ -446,7 +442,6 @@ const loadContentData = async () => {
     name.value = '';
   }
 
-  console.log('kd_jabatan after loading document data:', kd_jabatan.value);
 
   if (step.value === 1) {
     // Load data for step 1
@@ -460,38 +455,17 @@ const loadContentData = async () => {
 function prevStep() {
   if (step.value > 1) step.value--
 }
-console.log("Category create from route:", createType);
 const file = ref(null)
 const fileName = ref('')
 const uploadProgress = ref(0)
-const MAX_FILE_SIZE_MB = 2
+const MAX_FILE_SIZE_MB = 20
 
-const typeDocuments = ref('')
-const areas = ref([
-  { id_area: 'ho', nm_area: 'HO', children: [] },
-  {
-    id_area: 'jaya', nm_area: 'Jaya', children: [
-      { id_area: 'kl', nm_area: 'KL', children: [] },
-      { id_area: 'ku', nm_area: 'Ku', children: [] }
-    ]
-  },
-  {
-    id_area: 'jabar', nm_area: 'Jabar', children: [
-      { id_area: 'hi', nm_area: 'HI', children: [] },
-      { id_area: 'bogor', nm_area: 'Bogor', children: [] }
-    ]
-  },
-  {
-    id_area: 'kepri', nm_area: 'Kepri', children: [
-      { id_area: 'batam', nm_area: 'Batam Center', children: [] },
-      { id_area: 'batuaji', nm_area: 'Batu Aji', children: [] }
-    ]
-  }
-]);
+const typeDocuments = ref([])
+const areas = ref([]);
 
 const submenu = ref('')
 
-const { handleSubmit, isSubmitting, values, errors, defineField, isLoading } = useForm({
+const { handleSubmit, isSubmitting, errors, defineField, setErrors } = useForm({
   validationSchema: toTypedSchema(AnnouncementInfoSchema),
   initialValues: {
     submenu_id: '',
@@ -532,80 +506,34 @@ const [kd_jabatan] = defineField('kd_jabatan');
 const [dokumen] = defineField('dokumen');
 
 const showLoading = ref(true);
-onMounted(async () => {
-  const lastStep = ref(1);
-  // jika udah ke load baru dipanggil
+const loadError = ref('');
+async function loadForm() {
+  showLoading.value = true;
+  loadError.value = '';
   try {
-    const [resTypes, resAreas, resJabatan, wizardRes] = await Promise.all([
-      getTypesByIdMenu(createType),
-      getCabang(),
-      getJabatan(),
-      // wizardSession()
+    if (isEditMode.value) await loadContentData();
+    const [resTypes, resAreas, resJabatan] = await Promise.all([
+      getTypesByIdMenu(createType.value), getCabang(), getJabatan()
     ]);
-
-
-    daftarJabatan.value = resJabatan.map(j => ({ id: j.kd_jabatan, nama: j.nm_jabatan }));
     typeDocuments.value = resTypes;
-
-
-
-    // cara ngambil ke database, gimana
-    areas.value = resAreas.map(area => ({
-      id_area: area.id_area,
-      nm_area: area.nm_area,
-      children: area.children ? area.children.map(child => ({
-        id_area: child.id_area,
-        nm_area: child.nm_area,
-        children: []
-      })) : []
-    }));
-
-    if (isEditMode.value) {
-      await loadContentData();
-      // karena createType berubah, reload types sesuai menu.id
-      const resCabangEdit = await getCabang();
-      areas.value = resCabangEdit.map(area => ({
-        id_area: area.id_area,
-        nm_area: area.nm_area,
-        children: area.children ? area.children.map(child => ({
-          id_area: child.id_area,
-          nm_area: child.nm_area,
-          children: []
-        })) : []
-      }));
-      typeDocuments.value = await getTypesByIdMenu(createType.value);
-    } else {
-      createType.value = route.query.type || 1; // default 1 kalau gak ada
-      typeDocuments.value = await getTypesByIdMenu(createType.value);
-    }
-
-    // const wizard = wizardRes.wizard || {};
-    // if (wizard[1]) { Object.assign(values, wizard[1]); lastStep.value = 1; }
-    // // Ambil regionals_id dari session wizard jika ada
-    // if (wizard[2]) {
-    //   // Jika regionals_id sudah ada di session, pakai itu
-    //   if (wizard[2].regionals_id && wizard[2].regionals_id.length > 0) {
-    //     regionals_id.value = wizard[2].regionals_id;
-    //   }
-    //   lastStep.value = 2;
-    // }
-    // if (wizard[3]) { kd_jabatan.value = wizard[3].kd_jabatan || []; lastStep.value = 3; }
-    // step.value = lastStep.value;
-
-    showLoading.value = false;
+    areas.value = resAreas;
+    daftarJabatan.value = resJabatan.map(j => ({ id: j.kd_jabatan, nama: j.nm_jabatan }));
   } catch (error) {
-    console.error(error);
+    loadError.value = 'Data formulir gagal dimuat. Silakan coba lagi.';
+  } finally {
+    showLoading.value = false;
   }
-});
+}
+onMounted(loadForm);
 
 
 
 function handleTypeChange(submenuId) {
-  submenu.value = typeDocuments.value.find(type => type.id === submenuId).name;
+  submenu.value = typeDocuments.value.find(type => String(type.id) === String(submenuId))?.name || '';
 }
 
 
-const onSubmit = handleSubmit(async () => {
+const submitForm = handleSubmit(async () => {
   try {
     const formData = new FormData();
     formData.append('title', title.value || '');
@@ -618,7 +546,7 @@ const onSubmit = handleSubmit(async () => {
     (regionals_id.value || []).forEach(id => formData.append('regionals_id[]', id));
     (kd_jabatan.value || []).forEach(id => formData.append('kd_jabatan[]', id));
 
-    if (file.value) {
+    if (type.value === 'pdf' && file.value) {
       formData.append('dokumen', file.value, file.value.name);
       dokumen.value = file.value; // set vee-validate field at submit time
     }
@@ -638,7 +566,11 @@ const onSubmit = handleSubmit(async () => {
 
     router.push(`/detail-pengumuman/${submenu_id.value}`);
   } catch (error) {
-    console.error(error);
+    const validationErrors = error?.response?.data?.errors;
+    if (validationErrors) {
+      setErrors(Object.fromEntries(Object.entries(validationErrors).map(([key, messages]) => [key, messages[0]])));
+      step.value = 1;
+    }
     Swal.fire({
       title: "Error!",
       text: `${error?.response?.data?.message || error?.message || 'An error occurred.'}`,
@@ -648,33 +580,48 @@ const onSubmit = handleSubmit(async () => {
   } finally {
     uploadProgress.value = 0;
   }
-});
+}, () => { step.value = 1; });
+
+function onSubmit() {
+  if (isSubmitting.value) return;
+  if (step.value < 3) return nextStep();
+  if (!regionals_id.value.length) { step.value = 2; return; }
+  if (!kd_jabatan.value.length) return;
+  if (type.value === 'pdf' && !file.value && !urlThumbnail.value) {
+    setErrors({ dokumen: 'File PDF wajib dipilih.' });
+    step.value = 1;
+    return;
+  }
+  return submitForm();
+}
 
 function onFileChange(e) {
   const f = e.target.files?.[0];
   if (!f) {
+    dokumen.value = null;
     file.value = null;
     fileName.value = '';
     return;
   }
 
-  if ((f.size / 1024 / 1024) > MAX_FILE_SIZE_MB) {
+  if (f.type !== 'application/pdf' || (f.size / 1024 / 1024) > MAX_FILE_SIZE_MB) {
     Swal.fire({
-      title: 'File terlalu besar',
-      text: `Ukuran file maksimal ${MAX_FILE_SIZE_MB} MB.`,
+      title: 'File tidak valid',
+      text: `Pilih file PDF maksimal ${MAX_FILE_SIZE_MB} MB.`,
       icon: 'warning'
     });
     e.target.value = ''; // reset input
+    dokumen.value = null;
     file.value = null;
     fileName.value = '';
     return;
   }
 
   // HANYA simpan di ref lokal — jangan set dokumen.value di sini
+  dokumen.value = f;
   file.value = f;
   fileName.value = f.name;
   uploadProgress.value = 0;
-  console.log('Selected file:', f.name, f.size);
 }
 </script>
 

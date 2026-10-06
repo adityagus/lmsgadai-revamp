@@ -1,12 +1,11 @@
 <template>
-  <!-- Top Buttons (Skeleton saat loading, Button asli saat loaded) -->
+  <!-- Top Buttons (Skeleton hanya untuk role yang dapat mengelola dokumen) -->
   <div class="flex justify-end mb-4 gap-2 min-h-[40px]">
-    <template v-if="isLoading">
+    <template v-if="isLoading && canManageDocuments">
       <div class="w-36 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
       <div class="w-24 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
     </template>
-    <template
-      v-else-if="auth && (auth.idgrup == 'JBT-032' || auth.idgrup === 'JBT-037' || auth.idgrup === 'JBT-039' || auth.idgrup === 'JBT-040')">
+    <template v-else-if="!isLoading && canManageDocuments">
       <router-link :to="{ name: 'information-document-create', query: { type: category } }"
         class="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold shadow hover:bg-green-700 transition flex items-center">
         + Create &nbsp;<span>{{ category == 1 ? 'Pengumuman' : category == 2 ? 'Formulir' : 'Report' }}</span>
@@ -95,9 +94,10 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
-import { getAnnouncements } from '@/services/announcementService';
+import { getAnnouncements } from '@/services/queries/announcementQuery.ts';
 import { useRoute } from '@/navigation';
-import { getSession } from '@/services/authService';
+import { getSession } from '@/services/queries/authQuery.ts';
+import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
   category: {
@@ -114,7 +114,12 @@ const category = computed(() => {
   return props.category ?? (route.meta.values || 1);
 });
 
-const auth = ref(null);
+const page = usePage();
+const auth = ref(page.props.auth || null);
+const canManageDocuments = computed(() => {
+  const user = auth.value;
+  return ['admin', 'sop'].includes(user?.role);
+});
 
 const icons = ref([
   'https://unpkg.com/heroicons@2.0.13/24/solid/document.svg',

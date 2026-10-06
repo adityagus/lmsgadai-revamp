@@ -43,8 +43,13 @@ class CourseAudience
     {
         if (in_array(app(LmsAccess::class)->role($request), ['admin', 'trainer', 'teacher'], true)) return true;
         $rules = $this->read($courseId);
-        if (!$rules) return true;
         if ($request->session()->get('auth.status') !== 'login') return false;
+        $username = (string) $request->session()->get('auth.user', '');
+        if (Schema::hasTable('course_participants') && $username !== '' && DB::table('course_participants')
+            ->where('course_id', $courseId)->where('username', $username)->exists()) {
+            return true;
+        }
+        if (!$rules) return true;
         $position = (string) $request->session()->get('auth.idgrup', '');
         return $position !== '' && in_array($position, $rules, true);
     }

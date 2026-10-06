@@ -150,11 +150,10 @@
 </template>
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
 import CardCourses from '../courses/card.vue'
-import { adminOverview, userOverview } from '../../services/masterService'
-import { getLastDocumentPreview } from '../../services/announcementService'
-import { recordDocumentView } from '../../services/documentViewService'
+import { adminOverview, userOverview } from '@/services/queries/masterQuery.ts';
+import { getLastDocumentPreview } from '@/services/queries/announcementQuery.ts';
+import { recordDocumentView } from '@/services/mutations/documentViewMutation.ts';
 import OpenModalPDF from '@/components/openModalPDF.vue';
 
 

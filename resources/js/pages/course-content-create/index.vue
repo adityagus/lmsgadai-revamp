@@ -167,10 +167,10 @@
 <script setup>
 import { ref, reactive, watchEffect, onMounted, onUnmounted, computed, watch, nextTick, defineAsyncComponent } from 'vue';
 import CKEditor from '@ckeditor/ckeditor5-vue';
-import * as ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-import axios from 'axios';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { useMutation } from '@tanstack/vue-query';
-import { createContent, getContentsByCourseId, updateContent, getContentById } from '@/services/contentService';
+import { createContent, updateContent } from '@/services/mutations/contentMutation.ts';
+import { getContentsByCourseId, getContentById } from '@/services/queries/contentQuery.ts';
 import { mutateContentSchema } from '@/utils/zodSchema';
 import { useForm } from 'vee-validate';
 import { toTypedSchema } from '@vee-validate/zod';
@@ -179,6 +179,7 @@ import Swal from 'sweetalert2';
 import { api as quizApi, errorMessage } from '../quiz/api';
 import { courseContentType } from '@/utils/courseContentType.mjs';
 import '../quiz/quiz.css';
+const ckeditor = CKEditor.component;
 const QuizEditor = defineAsyncComponent(() => import(/* webpackChunkName: "QuizEditor" */ '../quiz/QuizEditor.vue'));
 const quizDialog = ref(null), quizEditorOpen = ref(false), quizEditorId = ref(null);
 async function openQuizEditor(id = null) { quizEditorId.value = id; quizEditorOpen.value = true; await nextTick(); quizDialog.value.showModal(); }
@@ -287,13 +288,9 @@ function refreshQuizChoices() { if (type.value === 'quiz') loadQuizzes(); }
 onUnmounted(() => window.removeEventListener('focus', refreshQuizChoices));
 
 
-const mutateCreate = useMutation({
-  mutationFn: async (data) => await createContent(data)
-});
+const mutateCreate = useMutation(createContent.options());
 
-const mutateUpdate = useMutation({
-  mutationFn: async (data) => await updateContent(data, contentId)
-});
+const mutateUpdate = useMutation(updateContent.options());
 
 
 const editorConfig = {
@@ -311,11 +308,18 @@ const editorConfig = {
     "mediaEmbed",
     "|",
     "bulletedList",
-    "numberedList",
+  "numberedList",
     "indent",
     "outdent",
   ],
-  initialData: content == null ? "" : content.text,
+  mediaEmbed: {
+    previewsInData: true,
+    providers: [{
+      name: 'canva',
+      url: /^https?:\/\/(?:www\.)?canva\.com\/design\/[\w-]+\/view(?:\?.*)?$/i,
+      html: match => `<iframe src="${match[0].replace(/([?&])embed(?:=true)?/i, '$1embed=true')}${match[0].includes('?') ? '&' : '?'}embed=true" loading="lazy" allowfullscreen></iframe>`,
+    }],
+  },
 };
 
 const onFileChange = (event) => {
@@ -375,7 +379,7 @@ const onSubmit = handleSubmit(async () => {
         formData.append('order', existingOrder.value);
       }
       formData.append('_method', 'PUT');
-      await mutateUpdate.mutateAsync(formData);
+      await mutateUpdate.mutateAsync([formData, contentId]);
       console.log('Content updated successfully');
       Swal.fire({
         title: 'Berhasil!',
@@ -388,7 +392,7 @@ const onSubmit = handleSubmit(async () => {
       // Create new content - assign next order
       formData.append('order', await countContent());
       console.log('Creating content with data:', formData);
-      await mutateCreate.mutateAsync(formData);
+      await mutateCreate.mutateAsync([formData]);
       console.log('Content created successfully');
       Swal.fire({
         title: 'Berhasil!',
@@ -416,11 +420,6 @@ const onSubmit = handleSubmit(async () => {
   }
 });
 
-const ckeditor = CKEditor.component
-
-// export default {
-//   components: {
-//     ckeditor: CKEditor.component
 //   }
 // }
 

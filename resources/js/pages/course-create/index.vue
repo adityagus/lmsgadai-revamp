@@ -1,12 +1,14 @@
 <script setup>
-import axios from "axios";
+import { getCourseAccessOptions } from '@/services/queries/courseQuery.ts';
 import Swal from "sweetalert2";
 import { reactive, ref, defineProps, onMounted } from "vue";
 import { useForm, useField } from 'vee-validate';
 import { createCourseSchema, updateCourseSchema } from "@/utils/zodSchema";
 import { toTypedSchema } from '@vee-validate/zod';
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { createCourse, getCategories, getCourseById, updateCourse } from "@/services/courseService";
+import { useMutation } from "@tanstack/vue-query";
+import { createCourse, updateCourse } from '@/services/mutations/courseMutation.ts';
+import { getCategories } from '@/services/queries/categoryQuery.ts';
+import { getCourseById } from '@/services/queries/courseQuery.ts';
 import { useRoute, useRouter } from "@/navigation";
 
 
@@ -18,7 +20,7 @@ const accessPositions = ref([]);
 const selectedAccessPositions = ref([]);
 const accessSearch = ref('');
 
-const queryClient = useQueryClient();
+
 const router = useRouter();
 const route = useRoute();
 const id = route.params.courseId;
@@ -38,13 +40,9 @@ const triggerFileInput = () => {
   // inputFileRef.value?.click();
 };
 
-const mutateCreate = useMutation({
-  mutationFn: (data) => createCourse(data)
-})
+const mutateCreate = useMutation(createCourse.options())
 
-const mutateUpdate = useMutation({
-  mutationFn: (data) => updateCourse(data, id)
-})
+const mutateUpdate = useMutation(updateCourse.options())
 
 // Function untuk menangani perubahan pada file input
 const onFileChange = (event) => {
@@ -122,12 +120,12 @@ const onSubmit = handleSubmit(async () => {
     console.log("Form values:", values);
 
     if (edit) {
-      await mutateUpdate.mutateAsync(formData);
+      await mutateUpdate.mutateAsync([formData, id]);
     } else {
-      await mutateCreate.mutateAsync(formData);
+      await mutateCreate.mutateAsync([formData]);
     }
 
-    queryClient.invalidateQueries({ queryKey: ['courses'] });
+
     await Swal.fire({
       title: "Berhasil!",
       text: `Kelas berhasil ${edit ? 'diperbarui' : 'dibuat'}.`,
@@ -171,8 +169,8 @@ onMounted(async () => {
       selectedAccessPositions.value = fetchedCourse.access_positions || [];
     }
 
-    const accessResponse = await axios.get('/api/course-access-options');
-    accessPositions.value = accessResponse.data.positions || [];
+    const accessResponse = await getCourseAccessOptions();
+    accessPositions.value = accessResponse.positions || [];
 
 
   } catch (error) {
@@ -308,7 +306,7 @@ onMounted(async () => {
         class="w-full rounded-full border border-[#060A23] py-3 sm:p-[14px_20px] font-semibold text-nowrap flex items-center justify-center text-xs sm:text-sm hover:bg-gray-50 transition-colors">
         Cancel
       </router-link>
-      <button type="submit" :disabled="edit ? mutateUpdate.isLoading : mutateCreate.isLoading"
+      <button type="submit" :disabled="isSubmitting"
         class="w-full rounded-full py-3 sm:p-[14px_20px] font-semibold text-white bg-[#662FFF] text-nowrap text-xs sm:text-sm hover:bg-[#5521cc] transition-colors cursor-pointer">
         {{ !edit ? "Create " : "Update" }} Now
       </button>

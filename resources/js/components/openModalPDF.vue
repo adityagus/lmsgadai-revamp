@@ -58,7 +58,7 @@
 import { ref, computed, onMounted, defineExpose } from 'vue';
 import ContentPdf from '@/pages/course-preview/ContentPdf.vue';
 import ContentText from '@/pages/course-preview/ContentText.vue';
-import { getSession } from '@/services/authService';
+import { getSession } from '@/services/queries/authQuery.ts';
 
 const props = defineProps({
   // cards: Array,

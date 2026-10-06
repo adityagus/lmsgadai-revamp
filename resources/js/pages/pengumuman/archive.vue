@@ -69,13 +69,13 @@
 
 <script setup>
 import { ref, onMounted, watch, defineProps } from 'vue';
-import axios from 'axios';
-import { trashAnnouncement, restoreAnnouncement } from '@/services/announcementService';
+import { trashAnnouncement } from '@/services/queries/announcementQuery.ts';
+import { restoreAnnouncement } from '@/services/mutations/announcementMutation.ts';
 import SkeletonBreadcrumb from '@/components/SkeletonBreadcrumb.vue';
 import { useRoute } from '@/navigation';
-import { hardDeleteAnnouncement } from '../../services/announcementService';
+import { hardDeleteAnnouncement } from '@/services/mutations/announcementMutation.ts';
 import Swal from 'sweetalert2';
-import { getSession } from '../../services/authService';
+import { getSession } from '@/services/queries/authQuery.ts';
 
 
 const route = useRoute();

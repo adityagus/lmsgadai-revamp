@@ -43,14 +43,14 @@
 								</button>
 							</td>
 						</tr>
-						<tr v-if="categories.length === 0">
-							<td colspan="3" class="py-6 text-center text-gray-400">No categories found.</td>
+						<tr v-if="!loading && !error && categories.length === 0">
+							<td colspan="4" class="py-6 text-center text-gray-400">No categories found.</td>
 						</tr>
 					</tbody>
 				</table>
 			</div>
 
-			<div v-if="error" class="mt-4 text-red-600 text-center">{{ error }}</div>
+			<div v-if="error" class="mt-4 text-red-600 text-center">{{ error }} <button type="button" class="underline" @click="refetch()">Coba lagi</button></div>
 			<div v-if="success" class="mt-4 text-green-600 text-center">{{ success }}</div>
 			<div v-if="loading" class="mt-4 text-center text-gray-500">Loading...</div>
 		</div>
@@ -84,119 +84,58 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import { useQuery } from '@tanstack/vue-query';
-import { getCategories } from '../../services/courseService';
+import { computed, ref } from 'vue';
+import { useQuery, useMutation } from '@tanstack/vue-query';
+import { getCategories } from '@/services/queries/categoryQuery.ts';
+import { createCategory, updateCategory as editCategory, removeCategory } from '@/services/mutations/categoryMutation.ts';
 
-const categories = ref([]);
-const loading = ref(false);
-const showModal = ref(false);
-const editMode = ref(false);
+const { data, isFetching: loading, error: queryError, refetch } = useQuery(getCategories.options());
+const categories = computed(() => data.value || []);
+const create = useMutation(createCategory.options());
+const update = useMutation(editCategory.options());
+const remove = useMutation(removeCategory.options());
+const modalLoading = computed(() => create.isPending.value || update.isPending.value);
+const showModal = ref(false), editMode = ref(false);
 const form = ref({ id: null, name: '' });
-const error = ref('');
-const success = ref('');
-const modalError = ref('');
-const modalLoading = ref(false);
-
-
-// const {data, isPending} = useQuery(
-//   ['getCategories'], fetchCategories
-// );
-
-// console.log('getCategories', data, isPending);
-
-function fetchCategories() {
-	loading.value = true;
-	error.value = '';
-	axios.get('/api/categories')
-		.then(res => {
-			// console.log(res.data);
-			categories.value = res.data;
-		})
-		.catch(() => {
-			categories.value = [];
-			error.value = 'Failed to fetch categories.';
-		})
-		.finally(() => {
-			loading.value = false;
-		});
-}
+const actionError = ref(''), success = ref(''), modalError = ref('');
+const error = computed(() => actionError.value || (queryError.value ? 'Kategori gagal dimuat. Silakan coba lagi.' : ''));
 
 function openAddModal() {
-	form.value = { id: null, name: '' };
-	editMode.value = false;
-	showModal.value = true;
-	modalError.value = '';
+  form.value = { id: null, name: '' };
+  editMode.value = false; showModal.value = true; modalError.value = '';
 }
-
 function openEditModal(cat) {
-	form.value = { id: cat.id, name: cat.name };
-	editMode.value = true;
-	showModal.value = true;
-	modalError.value = '';
+  form.value = { id: cat.id, name: cat.name };
+  editMode.value = true; showModal.value = true; modalError.value = '';
 }
-
 function closeModal() {
-	showModal.value = false;
-	modalError.value = '';
+  if (modalLoading.value) return;
+  showModal.value = false; modalError.value = '';
 }
-
-function addCategory() {
-	modalLoading.value = true;
-	modalError.value = '';
-	axios.post('/api/categories', { name: form.value.name })
-		.then(() => {
-			fetchCategories();
-			closeModal();
-			success.value = 'Category added successfully!';
-			setTimeout(() => success.value = '', 2000);
-		})
-		.catch(err => {
-			modalError.value = err.response?.data?.message || 'Failed to add category.';
-		})
-		.finally(() => {
-			modalLoading.value = false;
-		});
+async function saveCategory(edit) {
+  if (modalLoading.value) return;
+  modalError.value = ''; actionError.value = ''; success.value = '';
+  try {
+    if (edit) await update.mutateAsync([form.value.id, { name: form.value.name }]);
+    else await create.mutateAsync([{ name: form.value.name }]);
+    showModal.value = false;
+    success.value = edit ? 'Kategori berhasil diperbarui.' : 'Kategori berhasil ditambahkan.';
+  } catch (err) {
+    modalError.value = err.response?.data?.message || 'Kategori gagal disimpan.';
+  }
 }
-
-function updateCategory() {
-	modalLoading.value = true;
-	modalError.value = '';
-	axios.put(`/api/categories/${form.value.id}`, { name: form.value.name })
-		.then(() => {
-			fetchCategories();
-			closeModal();
-			success.value = 'Category updated successfully!';
-			setTimeout(() => success.value = '', 2000);
-		})
-		.catch(err => {
-			modalError.value = err.response?.data?.message || 'Failed to update category.';
-		})
-		.finally(() => {
-			modalLoading.value = false;
-		});
+const addCategory = () => saveCategory(false);
+const updateCategory = () => saveCategory(true);
+async function deleteCategory(id) {
+  if (remove.isPending.value || !confirm('Are you sure you want to delete this category?')) return;
+  actionError.value = ''; success.value = '';
+  try {
+    await remove.mutateAsync([id]);
+    success.value = 'Kategori berhasil dihapus.';
+  } catch (err) {
+    actionError.value = err.response?.data?.message || 'Kategori gagal dihapus.';
+  }
 }
-
-function deleteCategory(id) {
-	if (confirm('Are you sure you want to delete this category?')) {
-		loading.value = true;
-		axios.delete(`/api/categories/${id}`)
-			.then(() => {
-				fetchCategories();
-				success.value = 'Category deleted successfully!';
-				setTimeout(() => success.value = '', 2000);
-			})
-			.catch(() => {
-				error.value = 'Failed to delete category.';
-			})
-			.finally(() => {
-				loading.value = false;
-			});
-	}
-}
-
-onMounted(fetchCategories);
 </script>
 
 <style scoped>

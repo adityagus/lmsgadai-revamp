@@ -73,7 +73,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { getOverview } from '@/services/queries/masterQuery.ts'
 
 const overview = ref({
   active_users: 0,
@@ -87,7 +87,7 @@ const overview = ref({
 onMounted(async () => {
   try {
     // throw new Error("Simulated fetch error");
-    const res = await axios.get('/api/overview')
+    const res = await getOverview()
     overview.value = res.data.stats
     console.log("Overview data fetched:", overview.value);
   } catch (e) {

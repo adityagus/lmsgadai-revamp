@@ -2,21 +2,20 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Http\Request;
 
+/**
+ * Compatibility service for existing callers. RoleAccess owns the rules.
+ */
 class LmsAccess
 {
-    public function role($request)
+    public function role(Request $request): ?string
     {
-        if ($request->session()->get('auth.status') !== 'login') {
-            return null;
-        }
-        if (in_array($request->session()->get('auth.idgrup'), config('quiz.admin_positions', []), true)) {
-            return 'admin';
-        }
-        return Schema::hasTable('lms_users')
-            ? DB::table('lms_users')->where('username', $request->session()->get('auth.user'))->value('role') ?? 'student'
-            : 'student';
+        return RoleAccess::role($request);
+    }
+
+    public function roleForPosition(?string $position): string
+    {
+        return RoleAccess::roleForPosition($position);
     }
 }

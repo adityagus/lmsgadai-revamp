@@ -15,7 +15,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import { migrateData } from '@/services/mutations/migrationMutation.ts'
 
 const file = ref(null)
 const success = ref(false)
@@ -35,9 +35,7 @@ async function submitExcel() {
   const formData = new FormData()
   formData.append('file', file.value)
   try {
-    await axios.post('/api/migrasi-data', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    await migrateData(formData)
     success.value = true
   } catch (e) {
     error.value = e.response?.data?.message || 'Migrasi gagal!' + e.message

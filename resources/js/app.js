@@ -1,7 +1,8 @@
 import '../css/app.css';
 import { createApp, h, watch } from 'vue';
 import { createInertiaApp, usePage } from '@inertiajs/vue3';
-import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
+import { VueQueryPlugin } from '@tanstack/vue-query';
+import { queryClient, clearApiCache } from './api/queryClient.ts';
 import AppLayout from './layouts/AppLayout.vue';
 import { RouterLink, useRoute, useRouter, installNavigationGuards } from './navigation';
 import pages from './pageRegistry';
@@ -16,13 +17,14 @@ createInertiaApp({
   },
   setup({el,App,props,plugin}) {
     const app = createApp({render:()=>h(App,props)});
-    app.use(plugin).use(VueQueryPlugin,{queryClient:new QueryClient()});
+    app.use(plugin).use(VueQueryPlugin, { queryClient });
     app.component('RouterLink',RouterLink);
     Object.defineProperty(app.config.globalProperties,'$route',{get:()=>useRoute()});
     Object.defineProperty(app.config.globalProperties,'$router',{get:()=>useRouter()});
     app.mixin({mounted() {
       if(this.$root !== this) return;
       const page = usePage();
+      watch(() => JSON.stringify(page.props.auth ?? null), clearApiCache, { flush: 'sync' });
       watch(()=>page.props.csrfToken, token=>{
         const meta=document.querySelector('meta[name="csrf-token"]');
         if(meta && token) meta.content=token;

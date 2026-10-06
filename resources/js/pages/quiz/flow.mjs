@@ -1,5 +1,6 @@
 export function primaryQuizAction(quiz) {
     if (!quiz) return { kind: 'unavailable', label: 'Belum tersedia' };
+    if (quiz.sequence_locked) return { kind: 'unavailable', label: 'Selesaikan materi sebelumnya' };
     if (quiz.active_attempt) return { kind: 'resume', label: 'Lanjutkan Quiz', attempt: quiz.active_attempt };
     if (quiz.can_start) return { kind: 'start', label: quiz.attempts?.length ? 'Kerjakan Lagi' : 'Mulai Quiz' };
     const completed = (quiz.attempts || []).filter(a => a.status !== 'IN_PROGRESS');
@@ -33,6 +34,6 @@ export function quizStepError(form, step) {
 export function passingGradeError(grade, questions) {
     const total = Math.round(questions.reduce((sum, q) => sum + Number(q.weight), 0) * 100) / 100;
     if (total > 100) return `Total bobot soal ${total} poin melebihi skala nilai 100. Kurangi bobot soal.`;
-    if (Number(grade) < total) return `Nilai minimal lulus tidak boleh kurang dari total bobot soal (${total} poin).`;
+    if (Number(grade) > total) return `Nilai minimal lulus tidak boleh melebihi total bobot soal (${total} poin).`;
     return '';
 }

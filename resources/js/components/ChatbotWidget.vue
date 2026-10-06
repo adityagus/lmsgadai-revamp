@@ -56,7 +56,7 @@
 
 <script setup>
 import { ref, nextTick } from 'vue';
-import axios from 'axios';
+import { sendAssistantMessage } from '@/services/mutations/assistantMutation.ts';
 
 const open = ref(false);
 const input = ref('');
@@ -92,21 +92,7 @@ function sendMessage() {
   let typingMsg = { from: 'bot', text: 'Sedang mengetik...', style: 'italic text-gray-400 animate-pulse' };
   messages.value.push(typingMsg);
   setTimeout(() => {
-    axios.post(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        model: 'deepseek/deepseek-r1-0528:free',
-        messages: [
-          { role: 'user', content: userMsg }
-        ]
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        }
-      }
-    )
+    sendAssistantMessage(userMsg, token)
       .then(response => {
         let reply = response.data?.choices?.[0]?.message?.content;
         // Hapus animasi mengetik sebelum push reply

@@ -1,0 +1,17 @@
+.git
+.agents
+.runtime
+.env
+.env.*
+auth.json
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+storage
+bootstrap/cache/*.php
+tests
+docs
+*.log
+.phpunit*

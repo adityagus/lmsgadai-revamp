@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Session;
 
 class AnnouncementController extends Controller
 {
+    private function authorizeDocumentMutation(): void
+    {
+        abort_unless(in_array(app(\App\Services\LmsAccess::class)->role(request()), ['admin', 'sop'], true), 403);
+    }
+
     /**
      * @var AnnouncementService
      */
@@ -79,6 +84,7 @@ class AnnouncementController extends Controller
      */
     public function store(StoreAnnouncementRequest $request)
     {
+        $this->authorizeDocumentMutation();
         $announcement = $this->announcementService->createAnnouncement(
             $request->validated(),
             $request->file('dokumen')
@@ -124,6 +130,7 @@ class AnnouncementController extends Controller
      */
     public function update(UpdateAnnouncementRequest $request, $document_id)
     {
+        $this->authorizeDocumentMutation();
         try {
             $content = $request->all();
             // dd($content);
@@ -154,6 +161,7 @@ class AnnouncementController extends Controller
      */
     public function destroy($document_id)
     {
+        $this->authorizeDocumentMutation();
         try {
             $this->announcementService->deleteAnnouncement((int) $document_id);
 
@@ -200,6 +208,7 @@ class AnnouncementController extends Controller
      */
     public function restore($document_id)
     {
+        $this->authorizeDocumentMutation();
         try {
             $announcement = $this->announcementService->restoreAnnouncement((int) $document_id);
 
@@ -272,6 +281,7 @@ class AnnouncementController extends Controller
      */
     public function hardDelete($document_id)
     {
+        $this->authorizeDocumentMutation();
         try {
             $this->announcementService->hardDeleteAnnouncement((int) $document_id);
 

@@ -1,15 +1,14 @@
 <template>
-  <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-[30px] mb-2 sm:mb-0">
+  <header class="flex flex-col sm:flex-row sm:items-center justify-between mb-2 sm:mb-0">
     <div>
       <h1 class="font-extrabold text-2xl sm:text-[28px] leading-tight sm:leading-[42px]">Daftar Kelas</h1>
       <p class="text-[#838C9D] text-xs sm:text-base mt-1">Lihat semua kelas yang tersedia</p>
     </div>
   </header>
-  <section :aria-busy="loading" id="CourseList" class="flex flex-col w-full rounded-2xl sm:rounded-[30px] gap-4 sm:gap-[30px] mt-4">
-    <div class="min-h-[24px] text-sm" role="status" aria-live="polite">
-      <span v-if="loading && loaded" class="text-[#662FFF]">Memperbarui kelas...</span>
-      <span v-else-if="error" class="text-red-600">{{ error }} <button type="button" class="underline" @click="fetchCourses()">Coba lagi</button></span>
-      <span v-else-if="loaded && !courses.length" class="text-gray-500">Belum ada kelas tersedia.</span>
+  <section :aria-busy="loading" id="CourseList" class="flex flex-col w-full rounded-2xl sm:rounded-[30px] gap-4  mt-4">
+    <!-- Konten utama (CardCourses) saat data sudah siap -->
+    <div class="flex w-full items-center justify-center" role="status" aria-live="polite">
+      <span v-if="!courses.length && loaded" class="text-gray-500">Belum ada kelas tersedia.</span>
     </div>
     <!-- Konten utama (CardCourses) saat data sudah siap -->
     <div v-for="item in courses" :key="item.id" v-if='loaded'>
@@ -64,7 +63,7 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useCourseList } from '@/composables/useCourseList.mjs';
-import { getCourses } from '../../../services/courseService.js';
+import { getCourses } from '@/services/queries/courseQuery.ts';
 import { useRouter } from '@/navigation';
 import CardSkeletonStudent from '../../../components/skeletons/CardSkeletonStudent.vue';
 

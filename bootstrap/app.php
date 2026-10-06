@@ -10,7 +10,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trimStrings(except: ['pass', 'password', 'password_confirmation']);
         $middleware->web(append: [\App\Http\Middleware\HandleInertiaRequests::class, \App\Http\Middleware\LmsAuthorization::class]);
-        $middleware->alias(['session.auth' => \App\Http\Middleware\RequireSessionAuth::class]);
+        $middleware->alias([
+            'session.auth' => \App\Http\Middleware\RequireSessionAuth::class,
+            'jabatan' => \App\Http\Middleware\RequirePosition::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {})
     ->create();

@@ -156,7 +156,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from '@/navigation'
-import { getCourseById } from '@/services/courseService'
+import { getCourseById } from '@/services/queries/courseQuery.ts';
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import AnimatedPlaceholder from '../../../components/AnimatedPlaceholder.vue'

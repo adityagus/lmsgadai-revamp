@@ -1,20 +1,10 @@
-import axios from "axios";
+import { getQuiz } from '../../services/queries/quizQuery.ts';
+import { mutateQuiz } from '../../services/mutations/quizMutation.ts';
 
-const base =
-    document.querySelector("base")?.href || `${window.location.origin}/`;
-const http = axios.create({
-    baseURL: new URL("api/quiz/", base).href,
-    withCredentials: true,
-    timeout: 15000,
-    headers: {
-        Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')
-            ?.content,
-    },
-});
-export const api = async (method, path, data) =>
-    (await http.request({ method, url: path, data })).data;
+// Compatibility dispatcher for existing quiz editors and attempt workflows.
+export const api = (method, path, data) => method.toLowerCase() === 'get'
+  ? getQuiz(path)
+  : mutateQuiz(method, path, data);
 export const errorMessage = (e) =>
     Object.values(e.response?.data?.errors || {})
         .flat()

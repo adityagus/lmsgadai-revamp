@@ -43,7 +43,7 @@ class QuizTest extends TestCase
         $this->question = DB::table('questions')->insertGetId(['bank_id' => $bank, 'question' => 'Pilih jawaban', 'type' => 'multiple_choice', 'weight' => 2.5, 'difficulty' => 'easy', 'explanation' => 'SECRET EXPLANATION', 'created_by' => $this->teacher]);
         $this->correct = DB::table('question_options')->insertGetId(['question_id' => $this->question, 'text' => 'Benar', 'is_correct' => true]);
         $this->wrong = DB::table('question_options')->insertGetId(['question_id' => $this->question, 'text' => 'Salah', 'is_correct' => false]);
-        $this->quiz = DB::table('quizzes')->insertGetId(['title' => 'Quiz Gadai', 'duration_minutes' => 45, 'question_count' => 1, 'passing_grade' => 75, 'maximum_attempt' => 1, 'randomize_question' => true, 'randomize_answer' => true, 'available_from' => now()->subHour(), 'available_until' => now()->addHours(3), 'status' => 'PUBLISHED', 'created_by' => $this->teacher]);
+        $this->quiz = DB::table('quizzes')->insertGetId(['title' => 'Quiz Gadai', 'duration_minutes' => 45, 'question_count' => 1, 'passing_grade' => 2.5, 'maximum_attempt' => 1, 'randomize_question' => true, 'randomize_answer' => true, 'available_from' => now()->subHour(), 'available_until' => now()->addHours(3), 'status' => 'PUBLISHED', 'created_by' => $this->teacher]);
         DB::table('quiz_classes')->insert(['quiz_id' => $this->quiz, 'class_id' => $this->class]);
         DB::table('quiz_questions')->insert(['quiz_id' => $this->quiz, 'question_id' => $this->question, 'position' => 0]);
         $this->loginAs('budi');
@@ -53,6 +53,37 @@ class QuizTest extends TestCase
     private function loginAs($name, $position = null) { $this->withSession(['auth' => ['user' => $name, 'nama' => $name, 'status' => 'login', 'idgrup' => $position]]); }
     private function start() { return $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertOk()->json(); }
     private function answer($a, $options, $revision = 0) { return $this->putJson('/api/quiz/attempts/'.$a['id'].'/answers/'.$a['questions'][0]['id'], ['selected_options' => $options, 'essay' => '', 'flagged' => true, 'visited' => true, 'revision' => $revision, 'student_id' => $this->other, 'score' => 100]); }
+
+    public function test_course_sequence_requires_prior_lesson_then_quiz_submission_before_next_lesson()
+    {
+        Schema::create('course_details', function ($t) {
+            $t->id(); $t->integer('course_id'); $t->integer('quiz_id')->nullable(); $t->string('type'); $t->integer('order');
+        });
+        (require database_path('migrations/2026_09_28_000001_create_course_content_progress_table.php'))->up();
+        DB::table('courses')->insert(['id' => 51, 'name' => 'Berurutan']);
+        DB::table('quizzes')->where('id', $this->quiz)->update(['course_id' => 51]);
+        DB::table('course_details')->insert([
+            ['id' => 1, 'course_id' => 51, 'type' => 'text', 'order' => 1, 'quiz_id' => null],
+            ['id' => 2, 'course_id' => 51, 'type' => 'quiz', 'order' => 2, 'quiz_id' => $this->quiz],
+            ['id' => 3, 'course_id' => 51, 'type' => 'pdf', 'order' => 3, 'quiz_id' => null],
+        ]);
+        $this->getJson('/api/quiz/student')->assertOk()->assertJsonPath('quizzes.0.sequence_locked', true)->assertJsonPath('quizzes.0.can_start', false);
+        $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
+        $this->postJson('/api/courses/51/progress/3/complete')->assertForbidden();
+        $this->postJson('/api/courses/51/progress/1/complete')->assertOk();
+        $this->getJson('/api/quiz/student')->assertJsonPath('quizzes.0.sequence_locked', false);
+        $attempt = $this->start();
+        $this->postJson('/api/courses/51/progress/3/complete')->assertForbidden();
+        $this->postJson('/api/courses/51/progress/2/complete')->assertUnprocessable();
+        $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertOk();
+        $this->postJson('/api/courses/51/progress/3/complete')->assertOk()->assertJsonPath('is_complete', true);
+        // A newly inserted prerequisite also blocks direct use of an older unfinished attempt.
+        DB::table('quiz_attempts')->where('id', $attempt['id'])->update(['status' => 'IN_PROGRESS', 'submitted_at' => null]);
+        DB::table('course_details')->insert(['id' => 4, 'course_id' => 51, 'type' => 'text', 'order' => 0]);
+        $this->getJson('/api/quiz/attempts/'.$attempt['id'])->assertForbidden();
+        $this->answer($attempt, [$this->correct])->assertForbidden();
+        $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertForbidden();
+    }
 
     public function test_quiz_audience_requires_both_position_and_branch_and_blocks_direct_attempt_access()
     {
@@ -75,6 +106,33 @@ class QuizTest extends TestCase
         $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
         app(\App\Services\Quiz\QuizAudience::class)->save($this->quiz, ['positions' => [], 'branches' => []]);
         $this->getJson('/api/quiz/attempts/'.$a['id'])->assertOk();
+    }
+
+    public function test_linked_quiz_inherits_course_participants_and_revocation_blocks_attempt_endpoints()
+    {
+        Schema::create('course_details', function ($t) { $t->id(); $t->integer('course_id'); $t->integer('quiz_id'); $t->string('type'); $t->integer('order')->default(1); });
+        (require database_path('migrations/2026_09_25_000003_create_course_access_rules.php'))->up();
+        (require database_path('migrations/2026_09_29_000001_create_course_participants_table.php'))->up();
+        DB::table('courses')->insert(['id' => 51, 'name' => 'Kelas Terbatas']);
+        DB::table('quizzes')->where('id', $this->quiz)->update(['course_id' => 51]);
+        DB::table('course_details')->insert(['course_id' => 51, 'quiz_id' => $this->quiz, 'type' => 'quiz']);
+        DB::table('course_access_rules')->insert(['course_id' => 51, 'position_code' => 'ALLOWED']);
+        app(\App\Services\Quiz\QuizAudience::class)->save($this->quiz, ['positions' => ['OLD'], 'branches' => ['0001']]);
+        $this->getJson('/api/quiz/student')->assertOk()->assertJsonCount(0, 'quizzes');
+        $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
+        DB::table('course_participants')->insert(['course_id' => 51, 'username' => 'budi']);
+        $this->getJson('/api/quiz/student')->assertOk()->assertJsonCount(1, 'quizzes');
+        $attempt = $this->start();
+        $this->answer($attempt, [$this->correct])->assertOk();
+        DB::table('course_participants')->where('course_id', 51)->delete();
+        $this->getJson('/api/quiz/attempts/'.$attempt['id'])->assertForbidden();
+        $this->answer($attempt, [$this->wrong], 1)->assertForbidden();
+        $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertForbidden();
+        $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
+        $this->assertDatabaseCount('quiz_attempts', 1);
+        $this->loginAs('budi', 'ALLOWED');
+        $this->getJson('/api/quiz/attempts/'.$attempt['id'])->assertOk();
+        $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertOk();
     }
 
     public function test_manager_can_save_read_clear_and_duplicate_audience_without_changing_attempts()
@@ -440,35 +498,39 @@ class QuizTest extends TestCase
         $this->getJson('/api/quiz/student')->assertOk()->assertJsonCount(0, 'quizzes');
         $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
         Schema::create('course_details', function (Blueprint $t) {
-            $t->id(); $t->unsignedBigInteger('course_id'); $t->unsignedBigInteger('quiz_id'); $t->string('type');
+            $t->id(); $t->unsignedBigInteger('course_id'); $t->unsignedBigInteger('quiz_id'); $t->string('type'); $t->integer('order')->default(1);
         });
         DB::table('course_details')->insert(['course_id' => $course, 'quiz_id' => $this->quiz, 'type' => 'quiz']);
+        (require database_path('migrations/2026_09_25_000003_create_course_access_rules.php'))->up();
+        DB::table('course_access_rules')->insert(['course_id' => $course, 'position_code' => 'JBT-001']);
         app(\App\Services\Quiz\QuizAudience::class)->save($this->quiz, ['positions' => ['JBT-001'], 'branches' => []]);
         $this->getJson('/api/quiz/student')->assertOk()->assertJsonCount(0, 'quizzes');
         $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertForbidden();
-        app(\App\Services\Quiz\QuizAudience::class)->save($this->quiz, ['positions' => [], 'branches' => []]);
+        DB::table('course_access_rules')->where('course_id', $course)->delete();
         $this->getJson('/api/quiz/student')->assertOk()->assertJsonPath('quizzes.0.course_id', $course);
         $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
         $this->loginAs('trainer');
         $this->getJson('/api/quiz/manage/'.$this->quiz.'/results')->assertOk()->assertJsonPath('classes.0.name', 'Produk Gadai')->assertJsonPath('statistics.participants', 3);
     }
 
-    public function test_passing_grade_must_cover_total_question_weight()
+    public function test_passing_grade_cannot_exceed_total_question_weight()
     {
         $this->loginAs('trainer');
         $form = $this->getJson('/api/quiz/manage/'.$this->quiz)->assertOk()->json();
         $form['course_id'] = DB::table('courses')->insertGetId(['name' => 'Bobot']);
         $form['class_ids'] = [];
-        DB::table('questions')->where('id', $this->question)->update(['weight' => 100]);
-        $form['passing_grade'] = 99;
+        DB::table('questions')->where('id', $this->question)->update(['weight' => 75]);
+        $form['passing_grade'] = 75.01;
         $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422)->assertJsonValidationErrors('passing_grade');
-        $form['passing_grade'] = 100;
+        $form['passing_grade'] = 74;
+        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
+        $form['passing_grade'] = 75;
         $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
         $question = $this->getJson('/api/quiz/questions')->assertOk()->json('0');
         DB::table('quizzes')->where('id', $this->quiz)->update(['status' => 'DRAFT']);
         $question['weight'] = 101;
         $this->putJson('/api/quiz/questions/'.$this->question, $question)->assertStatus(422);
-        $this->assertEquals(100, DB::table('questions')->where('id', $this->question)->value('weight'));
+        $this->assertEquals(75, DB::table('questions')->where('id', $this->question)->value('weight'));
         DB::table('questions')->where('id', $this->question)->update(['weight' => 101]);
         $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422)->assertJsonValidationErrors('passing_grade');
     }
@@ -484,7 +546,7 @@ class QuizTest extends TestCase
         $this->assertEquals(1, DB::table('quizzes')->where('id', $this->quiz)->value('no_schedule'));
         $this->assertEquals(0, DB::table('quizzes')->where('id', $this->quiz)->value('release_after_close'));
         Schema::create('course_details', function (Blueprint $t) {
-            $t->id(); $t->unsignedBigInteger('course_id'); $t->unsignedBigInteger('quiz_id'); $t->string('type');
+            $t->id(); $t->unsignedBigInteger('course_id'); $t->unsignedBigInteger('quiz_id'); $t->string('type'); $t->integer('order')->default(1);
         });
         DB::table('course_details')->insert(['course_id' => $course, 'quiz_id' => $this->quiz, 'type' => 'quiz']);
         $this->loginAs('budi');
@@ -540,6 +602,7 @@ class QuizTest extends TestCase
         $form['course_id'] = DB::table('courses')->insertGetId(['name' => 'Produk Gadai']);
         $this->postJson('/api/quiz/manage', $form)->assertStatus(422);
         $form['question_count'] = 1;
+        $form['passing_grade'] = 1;
         $created = $this->postJson('/api/quiz/manage', $form)->assertOk()->json('id');
         $this->assertSame(0, DB::table('quiz_classes')->where('quiz_id', $created)->count());
         $this->putJson('/api/quiz/questions/'.$newQuestion, $q)->assertStatus(422);

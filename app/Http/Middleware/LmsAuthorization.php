@@ -34,7 +34,7 @@ class LmsAuthorization
             abort_unless($manager, 403);
         }
         if ($short === 'AnnouncementController' && (!$request->isMethod('GET') || $method === 'trash')) {
-            abort_unless($role === 'admin', 403);
+            abort_unless(in_array($role, ['admin', 'sop'], true), 403);
         }
         if ($short === 'MigrasiDataController') abort_unless($role === 'admin', 403);
         if ($short === 'DocumentReportController' || ($short === 'DocumentViewController' && in_array($method, ['stats', 'viewedUsers', 'unviewedUsers'], true))) {

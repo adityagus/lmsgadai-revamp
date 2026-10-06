@@ -41,7 +41,7 @@
                             UMUM
                         </p>
                         <li
-                            v-if="auth && auth.role !== 'trainer'"
+                            v-if="auth"
                             :class="{ active: $route.name === 'overview' }"
                             class="transition-all duration-200"
                         >
@@ -177,9 +177,7 @@
                     <ul
                         class="flex flex-col gap-4"
                         v-if="
-                            quizManager || auth &&
-                            (auth.idgrup === 'JBT-032' ||
-                                auth.idgrup === 'JBT-038')
+                            (auth.role == 'admin' || auth.role == 'trainer')
                         "
                     >
                         <p
@@ -229,7 +227,7 @@
                         class="flex flex-col gap-4"
                         v-if="
                             auth &&
-                            (auth.role === 'trainer' || auth.idgrup === 'JBT-032' ||
+                            (auth.role === 'admin' || auth.role === 'sop' || auth.role === 'trainer' || auth.idgrup === 'JBT-032' ||
                                 auth.idgrup === 'JBT-037' ||
                                 auth.idgrup === 'JBT-019' ||
                                 auth.idgrup === 'JBT-020' ||
@@ -250,8 +248,8 @@
                             class="transition-all duration-200"
                         >
                             <div
-                                @click="handleParentClick('report')"
-                                :class="['flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group', activeSub === 'info' ? 'bg-[#7F33FF33]' : '']"
+                                @click="handleMainMenuClick('/report')"
+                                class="flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group"
                             >
                                 <img
                                     src="/assets/images/icons/report.svg"
@@ -263,71 +261,7 @@
                                 >
                                     Dokumen
                                 </span>
-                                <svg
-                                    width="24"
-                                    height="24"
-                                    :class="[
-                                        'ml-auto transition-transform w-7',
-                                        openMenu === 'report' ? 'rotate-90' : '',
-                                    ]"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                >
-                                    <path
-                                        d="M9 5L16 12L9 19"
-                                        stroke-width="2"
-                                        stroke="white"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                    />
-                                </svg>
                             </div>
-                                                        <transition name="fade">
-                                <ul
-                                    v-if="openMenu === 'report'"
-                                    class="pl-12 mt-2 space-y-2"
-                                >
-                                    <li
-                                        :class="{
-                                            active: activeSub === '/pengumuman',
-                                        }"
-                                        class="transition-all duration-200"
-                                    >
-                                        <div
-                                            @click.prevent="
-                                                handleSubClick('/pengumuman')
-                                            "
-                                            href="#"
-                                            class="text-white hover:text-[#7F33FF] px-5 py-2 rounded-lg cursor-pointer transition-all duration-200"
-                                        >
-                                            <span
-                                                class="font-semibold text-white group-hover:text-[#7F33FF] transition"
-                                                >Pengumuman</span
-                                            >
-                                        </div>
-                                    </li>
-                                    <li
-                                        :class="{
-                                            active: activeSub === '/formulir',
-                                        }"
-                                        class="transition-all duration-200"
-                                    >
-                                        <div
-                                            @click.prevent="
-                                                handleSubClick('/formulir')
-                                            "
-                                            href="#"
-                                            class="text-white hover:text-[#7F33FF] px-5 py-2 rounded-lg cursor-pointer transition-all duration-200"
-                                        >
-                                            <span
-                                                class="font-semibold text-white group-hover:text-[#7F33FF] transition"
-                                                >Formulir</span
-                                            >
-                                        </div>
-                                    </li>
-                                </ul>
-                            </transition>
                         </li>
                         <li
                             :class="{
@@ -342,7 +276,7 @@
                                 class="flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group"
                             >
                                 <img
-                                    src="/assets/images/icons/log-document.png"
+                                src="/assets/images/icons/activity-log.svg"
                                     class="w-6 h-6"
                                     alt="icon"
                                 />
@@ -380,8 +314,11 @@ const router = useRouter();
 const openMenu = ref("");
 const activeSub = ref(route.path);
 const page = usePage();
-const auth = computed(() => page.props.auth);
-const quizManager = computed(() => ["admin", "trainer", "teacher"].includes(auth.value?.role));
+const auth = ref(page.props.auth || null);
+const quizManager = computed(() =>
+    ["admin", "trainer", "teacher"].includes(auth.value?.role) ||
+    ["JBT-032", "JBT-038", "JBT-019", "JBT-020", "042"].includes(auth.value?.idgrup)
+);
 const isMobile = ref(window.innerWidth < 768);
 
 const handleResize = () => {
@@ -422,6 +359,15 @@ const handleSubClick = async (subPath) => {
 
 onMounted(async () => {
     window.addEventListener("resize", handleResize);
+    if (!auth.value) {
+        try {
+            const response = await fetch('/session', { headers: { Accept: 'application/json' } });
+            const payload = await response.json();
+            auth.value = payload.auth || null;
+        } catch (_) {
+            auth.value = null;
+        }
+    }
     const infoSubs = [
         "/pengumuman",
         "/overview/subitem2",

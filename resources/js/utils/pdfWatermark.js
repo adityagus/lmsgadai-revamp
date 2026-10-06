@@ -1,5 +1,5 @@
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
-import { getSession } from '@/services/authService';
+import { getSession } from '@/services/queries/authQuery.ts';
 
 function sanitizeForPdf(text) {
   if (!text) return '';

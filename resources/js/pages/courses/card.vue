@@ -24,7 +24,7 @@
           Hapus
         </button>
         <RouterLink :to="`/kelas/${id}`"
-          class="flex-1 sm:flex-none w-fit rounded-full border border-[#060A23] hover:bg-[#060A23] hover:text-white px-4 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm text-nowrap transition text-center">
+          class="flex-1 sm:flex-none w-fit rounded-full border border-[#662FFF] hover:bg-[#662FFF] hover:text-white px-4 sm:px-5 py-2.5 sm:py-3 font-semibold text-xs sm:text-sm text-nowrap transition text-center">
           Kelola
         </RouterLink>
       </div>
@@ -55,7 +55,6 @@ console.log(props);
 </script> -->
 
 <script setup>
-import axios from "axios";
 import { Button } from "primevue";
 import { RouterLink } from "@/navigation";
 
@@ -80,7 +79,6 @@ const deleteCourse = (id) => {
 //   if (result.isConfirmed) {
 
 //      try {
-//       const result = await axios.delete(`http://127.0.0.1:8000/api/kelas/${id}`)
 
 //       if(result.data.status == 200){
 //         Swal.fire({

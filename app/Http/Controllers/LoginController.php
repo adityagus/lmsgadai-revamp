@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Redirect;
+use App\Services\LmsAccess;
 
 class LoginController extends Controller
 {
@@ -47,7 +48,10 @@ class LoginController extends Controller
             $hashedPassword = trim($user->password_hash ?? '');
             // Employee auth stores Bcrypt $2a$ hashes. PHP verifies these directly;
             // Laravel's algorithm guard expects its own $2y$ variant.
-            if ($hashedPassword !== '' && password_verify($password, $hashedPassword) || true) {
+            $passwordMatches = $hashedPassword !== '' && password_verify($password, $hashedPassword);
+            $localBypass = app()->environment('local') && (bool) config('auth.login_bypass');
+
+            if ($passwordMatches || $localBypass) {
 
                 $nama = $user->full_name ?? '';
 
@@ -57,12 +61,13 @@ class LoginController extends Controller
                     'cabang' => $user->branch_code ?? null,
                     'jabatan' => $user->position_name ?? null,
                     'idgrup' => $user->position_code ?? null,
+                    // 'role' => app(LmsAccess::class)->roleForPosition($user->position_code ?? null),
                     'npk' => $user->npk ?? null,
                     'status' => 'login'
                 ];
 
-                session()->put('auth', $datasession);
                 $request->session()->migrate(true);
+                $request->session()->put('auth', $datasession);
 
                 $redirectUrl = '/overview';
                 if ($request->header('X-Inertia')) return redirect($redirectUrl);

@@ -14,11 +14,11 @@
   </header>
   <section :aria-busy="loading" id="CourseList" class="flex flex-col w-full rounded-2xl sm:rounded-[30px] p-2 gap-4 sm:gap-[10px]">
 
-    <div class="min-h-[24px] text-sm" role="status" aria-live="polite">
+    <!-- <div class="" role="status" aria-live="polite">
       <span v-if="loading && loaded" class="text-[#662FFF]">Memperbarui kelas...</span>
       <span v-else-if="error" class="text-red-600">{{ error }} <button type="button" class="underline" @click="fetchCourses()">Coba lagi</button></span>
       <span v-else-if="loaded && !courses.length" class="text-gray-500">Belum ada kelas tersedia.</span>
-    </div>
+    </div> -->
     <!-- Konten utama (CardCourses) saat data sudah siap -->
     <div v-for="item in courses" :key="item.id" v-if='loaded'>
       <CardCourses :id="item.id" :imageUrl="item.thumbnail_url" :name="item.name" :totalStudent="'12'"
@@ -50,8 +50,9 @@ import CardCourses from './card.vue';
 import { onMounted, ref, computed } from 'vue';
 import { useCourseList } from '@/composables/useCourseList.mjs';
 import Swal from "sweetalert2";
-import { deleteCourse, getCourses } from '@/services/courseService.js';
-import { getSession } from '../../services/authService';
+import { deleteCourse } from '@/services/mutations/courseMutation.ts';
+import { getCourses } from '@/services/queries/courseQuery.ts';
+import { getSession } from '@/services/queries/authQuery.ts';
 import CardSkeleton from '../../components/skeletons/CardSkeleton.vue';
 // import { deleteCourse, getCourses } from './../../../services/courseService.js';
 

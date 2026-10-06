@@ -17,10 +17,16 @@ test('missing or scheduled quiz cannot be started', () => {
     assert.equal(primaryQuizAction({status:'Belum Dimulai',attempts:[]}).label,'Belum dimulai');
 });
 const valid = {title:'Quiz Produk Gadai',duration_minutes:45,passing_grade:75,available_from:'2026-09-23T10:00',available_until:'2026-09-24T10:00',question_count:3,question_ids:[1,2,3],class_ids:[],overrides:[]};
-test('passing grade cannot be below the combined question weight', () => {
-    assert.match(passingGradeError(99, [{weight:40}, {weight:60}]), /100 poin/);
+test('locked course quizzes cannot start or resume through the quiz list', () => {
+    assert.deepEqual(primaryQuizAction({ sequence_locked: true, can_start: true, active_attempt: 7 }), { kind: 'unavailable', label: 'Selesaikan materi sebelumnya' });
+});
+test('passing grade cannot exceed the combined question weight', () => {
+    assert.equal(passingGradeError(99, [{weight:40}, {weight:60}]), '');
     assert.equal(passingGradeError(100, [{weight:40}, {weight:60}]), '');
-    assert.equal(passingGradeError(80, [{weight:30}, {weight:45}]), '');
+    assert.match(passingGradeError(80, [{weight:30}, {weight:45}]), /melebihi.*75 poin/);
+    assert.equal(passingGradeError(0, []), '');
+    assert.match(passingGradeError(1, []), /0 poin/);
+    assert.match(passingGradeError(0.31, [{weight:0.1}, {weight:0.2}]), /0.3 poin/);
     assert.equal(passingGradeError(0.3, [{weight:0.1}, {weight:0.2}]), '');
     assert.match(passingGradeError(100, [{weight:101}]), /melebihi/);
 });

@@ -1,6 +1,9 @@
 <?php
 
 return [
-    // Existing trusted employee position codes. Trainer access is assigned in lms_users.
-    'admin_positions' => ['JBT-032', 'JBT-038'],
+    // Compatibility setting; position-to-role mapping lives in config/access.php.
+    'admin_positions' => array_keys(array_filter(
+        config('access.position_roles', []),
+        fn ($role) => $role === 'admin',
+    )),
 ];

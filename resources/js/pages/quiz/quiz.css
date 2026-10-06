@@ -27,7 +27,7 @@
 }
 .quiz-app .muted {
     color: var(--muted);
-    font-size: 14px;
+    font-size: 12px;
 }
 .quiz-app .eyebrow {
     font-size: 11px;
@@ -301,7 +301,7 @@
     border-color: #8064e9;
 }
 .quiz-app .question-text {
-    font-size: 21px;
+    font-size: 18px;
     line-height: 1.65;
     white-space: pre-wrap;
     margin: 22px 0 28px;

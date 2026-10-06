@@ -152,9 +152,9 @@
 import { ref, onMounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import CardCourses from '@/pages/courses/card.vue';
-import { adminOverview, userOverview } from '@/services/masterService';
-import { getLastDocumentPreview } from '@/services/announcementService';
-import { recordDocumentView } from '@/services/documentViewService';
+import { adminOverview, userOverview } from '@/services/queries/masterQuery.ts';
+import { getLastDocumentPreview } from '@/services/queries/announcementQuery.ts';
+import { recordDocumentView } from '@/services/mutations/documentViewMutation.ts';
 import OpenModalPDF from '@/components/openModalPDF.vue';
 const page = usePage();
 const user = ref(page.props.auth || {});

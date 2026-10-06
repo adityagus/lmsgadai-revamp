@@ -24,7 +24,10 @@ export const updateCourseSchema = createCourseSchema.partial({
 
 export const AnnouncementInfoSchema = z.object({
     title: z.string().trim().min(1, { message: "Judul wajib diisi" }).max(150, { message: "Judul maksimal 150 karakter" }),
-    no_surat: z.string().min(5),
+    no_surat: z.string().trim().min(1, "Nomor surat wajib diisi").max(255),
+    content: z.string().nullable().optional(),
+    regionals_id: z.array(z.union([z.string(), z.number()])).min(1, "Pilih wilayah"),
+    kd_jabatan: z.array(z.union([z.string(), z.number()])).min(1, "Pilih jabatan"),
     dokumen: z.any().optional(),
     type: z.enum(["text", "pdf"], {
       errorMap: (issue, ctx) => {
@@ -35,12 +38,15 @@ export const AnnouncementInfoSchema = z.object({
         return { message: "Required content type" };
       }
     }),
-    tgl_berlaku: z.string(),// success: true,
-    submenu_id: z.number().min(1, {
+    tgl_berlaku: z.string().min(1, "Tanggal berlaku wajib diisi"),// success: true,
+    submenu_id: z.coerce.number().min(1, {
         message: "Please select submenu",
     }),
     created_at: z.string().optional(),
 }).superRefine((val, ctx) => {
+    if (val.type === 'text' && !val.content?.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['content'], message: 'Isi pengumuman wajib diisi' });
+    }
     if (val.tgl_berlaku && !Date.parse(val.tgl_berlaku)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,

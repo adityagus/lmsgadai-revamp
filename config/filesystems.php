@@ -1,5 +1,22 @@
 <?php
 
+$useMinio = env('LMS_STORAGE_DRIVER', 'local') === 's3';
+$publicPrefix = trim((string) env('MINIO_PUBLIC_PREFIX', 'public'), '/');
+$s3 = [
+    'driver' => 's3',
+    'key' => env('AWS_ACCESS_KEY_ID') ?: env('MINIO_ACCESS_KEY'),
+    'secret' => env('AWS_SECRET_ACCESS_KEY') ?: env('MINIO_SECRET_KEY'),
+    'region' => env('AWS_DEFAULT_REGION') ?: env('MINIO_REGION', 'us-east-1'),
+    'bucket' => env('AWS_BUCKET') ?: env('MINIO_BUCKET'),
+    'endpoint' => env('AWS_ENDPOINT') ?: env('MINIO_ENDPOINT'),
+    'use_path_style_endpoint' => env('MINIO_ENDPOINT')
+        ? env('MINIO_USE_PATH_STYLE_ENDPOINT', true)
+        : env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+    'visibility' => 'private',
+    'stream_reads' => true,
+    'throw' => true,
+];
+
 return [
 
     /*
@@ -13,7 +30,9 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DRIVER', 'local'),
+    'default' => $useMinio ? 's3' : env('FILESYSTEM_DISK', env('FILESYSTEM_DRIVER', 'local')),
+    'lms_storage_driver' => $useMinio ? 's3' : 'local',
+    'minio_public_prefix' => $publicPrefix,
 
     /*
     |--------------------------------------------------------------------------
@@ -35,29 +54,20 @@ return [
             'root' => env('LMS_UPLOAD_ROOT') ? dirname(env('LMS_UPLOAD_ROOT')) : storage_path('app'),
         ],
 
-        'public' => [
+        'public' => $useMinio ? [...$s3, 'root' => $publicPrefix] : [
             'driver' => 'local',
             'root' => env('LMS_UPLOAD_ROOT', storage_path('app/public')),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
         ],
-        'aktif' => [
+        'aktif' => $useMinio ? [...$s3, 'root' => ltrim($publicPrefix.'/aktif', '/')] : [
             'driver' => 'local',
             'root' => env('LMS_UPLOAD_ROOT', storage_path('app/public')).'/aktif',
             'url' => env('APP_URL').'/storage/aktif',
             'visibility' => 'public',
         ],
 
-        's3' => [
-            'driver' => 's3',
-            'key' => env('AWS_ACCESS_KEY_ID'),
-            'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'region' => env('AWS_DEFAULT_REGION'),
-            'bucket' => env('AWS_BUCKET'),
-            'url' => env('AWS_URL'),
-            'endpoint' => env('AWS_ENDPOINT'),
-            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-        ],
+        's3' => $s3,
 
     ],
 

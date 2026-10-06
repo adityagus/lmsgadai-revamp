@@ -3,6 +3,8 @@
 use App\Models\User;
 
 return [
+    // Temporary local debugging only. Never enable this in production.
+    'login_bypass' => env('LOGIN_BYPASS', false),
 
     /*
     |--------------------------------------------------------------------------

@@ -16,6 +16,7 @@
         </RouterLink>
         </div>
       </div>
+      <CourseContentOrder v-if="props.courseId" :key="props.courseId" :course-id="props.courseId" @saved="refreshOrder" />
       <ContentItem v-for="(content, index) in currentContents.data" :key="content?.id || index" :id="content?.id"
         :index="((currentContents.current_page - 1) * currentContents.per_page) + index + 1" :type="content?.type"
         :title="content?.title" :courseId="content?.course_id" :quizId="content?.quiz_id" :body="content?.content" @delete-content="handleDeleteContent" />
@@ -91,9 +92,10 @@
 </template>
 
 <script setup>
-import { getCourseByIdPagination } from '@/services/courseService';
-import { deleteContent } from '@/services/contentService';
+import { getCourseByIdPagination } from '@/services/queries/courseQuery.ts';
+import { deleteContent } from '@/services/mutations/contentMutation.ts';
 import ContentItem from './content-item.vue';
+import CourseContentOrder from './CourseContentOrder.vue';
 import { ref, defineProps, defineEmits, watch, onMounted } from 'vue';
 import Swal from 'sweetalert2';
 
@@ -150,6 +152,11 @@ const goToPage = async (page = 1) => {
     console.log("Navigated to page:", page);
   }
 }
+
+const refreshOrder = async () => {
+  pagination.value = 1;
+  await fetchContent(1);
+};
 
 const handleDeleteContent = async (contentId) => {
   console.log('Deleting content:', contentId);

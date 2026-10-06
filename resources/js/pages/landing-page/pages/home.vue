@@ -278,18 +278,20 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
+import { getCourses } from '@/services/queries/courseQuery.ts';
 import { Head, usePage } from '@inertiajs/vue3';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 
 const page = usePage();
 const signedIn = computed(() => Boolean(page.props.auth?.user));
-const courses = ref([]);
-const loadingCourses = ref(false);
-const courseError = ref('');
+const { data: courseData, isFetching: loadingCourses, error: queryError } = useQuery({ ...getCourses.options(1), enabled: signedIn });
+const courses = computed(() => courseData.value?.data || []);
+const courseError = computed(() => queryError.value ? 'Kursus belum dapat dimuat. Silakan coba kembali nanti.' : '');
+watch(courseData, async () => { await nextTick(); AOS.refresh(); });
 const isScrolled = ref(false);
-const abortController = new AbortController();
 const handleScroll = () => { isScrolled.value = window.scrollY > 50; };
 const truncateDescription = (text, maxWords) => {
   if (!text) return '';
@@ -301,24 +303,8 @@ onMounted(async () => {
   AOS.init({ once: true, disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches });
   handleScroll();
   window.addEventListener('scroll', handleScroll, { passive: true });
-  if (!signedIn.value) return;
-  loadingCourses.value = true;
-  try {
-    const response = await fetch('/api/courses', {
-      headers: { Accept: 'application/json' }, signal: abortController.signal,
-    });
-    if (!response.ok) throw new Error('Gagal memuat kursus');
-    const data = await response.json();
-    courses.value = Array.isArray(data) ? data : (data.data || []);
-    AOS.refresh();
-  } catch (error) {
-    if (error.name !== 'AbortError') courseError.value = 'Kursus belum dapat dimuat. Silakan coba kembali nanti.';
-  } finally {
-    loadingCourses.value = false;
-  }
 });
 onUnmounted(() => {
-  abortController.abort();
   window.removeEventListener('scroll', handleScroll);
 });
 </script>
