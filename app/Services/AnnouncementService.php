@@ -47,31 +47,11 @@ class AnnouncementService
      */
     public function getAnnouncementsByCategory($category, $jbt, $cabang)
     {
-        if ($cabang === null || $cabang === "") {
-            return $this->menu->where('id_menu', $category)
-                ->withCount(['announcements as count_tipe_announcement'])
-                ->get();
-        }
-
-        $menus = $this->menu->where('id_menu', $category)
-            ->with(['announcements' => function ($q) use ($jbt, $cabang) {
-                if ($cabang !== null) {
-                    $q
-                        ->whereHas('document_position', function ($qp) use ($jbt) {
-                            $qp->where('kd_jbt', $jbt);
-                        })
-                        ->whereHas('document_regional', function ($qr) use ($cabang) {
-                            $qr->where('regional_id', $cabang);
-                        });
-                }
+        return $this->menu->where('id_menu', $category)
+            ->withCount(['announcements as count_tipe_announcement' => function ($q) use ($jbt, $cabang) {
+                $q->forUser($jbt, $cabang);
             }])
             ->get();
-
-        return $menus->map(function ($menu) {
-            $menu->count_tipe_announcement = $menu->announcements->count();
-            unset($menu->announcements);
-            return $menu;
-        });
     }
 
     /**
@@ -82,14 +62,21 @@ class AnnouncementService
      * @param string|null $cabang
      * @return array
      */
-    public function getAnnouncementDetails($menu_id, $jbt, $cabang)
+    public function getAnnouncementDetails($menu_id, $jbt, $cabang, ?int $page = null, bool $includeRegions = true)
     {
         $announcementTitle = Menu::select('id', 'name', 'icon')->findOrFail($menu_id);
         // dd($announcementTitle);
-        $query = Announcement::with('menu:id', 'document_regional')
+        $query = Announcement::with('menu:id')
             ->where('submenu_id', $menu_id)
             ->orderBy('tgl_berlaku', 'desc')
-            ->distinct();
+            ->orderBy('id', 'desc');
+
+        if ($page !== null) {
+            $query->offset(($page - 1) * 20)->limit(20);
+        }
+        if ($includeRegions) {
+            $query->with('document_regional:document_id,regional_id');
+        }
 
         if ($cabang == null) {
             $announcements = $query->select('id', 'submenu_id', 'title', 'no_surat', 'url', 'tgl_berlaku', 'created_at', 'created_by', 'updated_at', 'updated_by', 'content', 'type')
@@ -127,9 +114,11 @@ class AnnouncementService
     public function createAnnouncement(array $data, $file)
     {
         $mainPath = $this->menu->getNameById($data['submenu_id']) ?: '';
-        $fileName = time() . '_' . $file->getClientOriginalName();
-
-        $publicPath = $this->fileUploadService->upload($file, $mainPath, $fileName);
+        $publicPath = null;
+        if ($file) {
+            $fileName = time() . '_' . $file->getClientOriginalName();
+            $publicPath = $this->fileUploadService->upload($file, $mainPath, $fileName);
+        }
 
         $insertData = $data;
         $insertData['created_at'] = Carbon::now('Asia/Jakarta');

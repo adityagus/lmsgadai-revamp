@@ -17,6 +17,8 @@ class QuizRequestGuard
                 ->header('Retry-After', RateLimiter::availableIn($key))->header('Cache-Control', 'private, no-store');
         }
         RateLimiter::hit($key, 60);
-        return $next($request)->header('Cache-Control', 'private, no-store, max-age=0');
+        $response = $next($request);
+        $response->headers->set('Cache-Control', 'private, no-store, max-age=0');
+        return $response;
     }
 }

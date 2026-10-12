@@ -42,12 +42,15 @@ const completedAt = (id) =>
 const completedLabel = (id) =>
     `Selesai: ${new Date(completedAt(id)).toLocaleString("id-ID")}`;
 const isContentCompleted = (id) => Boolean(completedAt(id));
+const nextIncompleteIndex = computed(() =>
+    contents.value.findIndex((item) => !isContentCompleted(item.id)),
+);
 const canOpenContent = (index) => {
     return (
         index >= 0 &&
         index < contents.value.length &&
         (route.name === "content-admin-preview" ||
-            index <= currentContentIndex.value ||
+            index === nextIncompleteIndex.value ||
             isContentCompleted(contents.value[index]?.id))
     );
 };
@@ -181,7 +184,6 @@ const fetchCourseData = async () => {
 };
 
 const goToContent = (index) => {
-    console.log("index", index, "contentindex", currentContentIndex.value);
     if (index >= 0 && index < contents.value.length && canOpenContent(index)) {
         if (index === currentContentIndex.value) {
             isMobileSidebarOpen.value = false;
@@ -466,13 +468,13 @@ watch(
                             >
                                 <button
                                     @click="goToContent(index)"
-                                    :disabled="!canOpenContent(index)  && !completedAt(content.id)"
+                                    :disabled="!canOpenContent(index)"
                                     class="w-full text-left disabled:cursor-not-allowed"
                                     :class="{
-                                        'opacity-50': !canOpenContent(index) && !completedAt(content.id),
+                                        'opacity-50': !canOpenContent(index),
                                     }"
                                     :title="
-                                        canOpenContent(index) && !completedAt(content.id)
+                                        canOpenContent(index)
                                             ? content.title
                                             : 'Perpindahan materi hanya melalui penyelesaian langkah aktif'
                                     "
@@ -502,7 +504,7 @@ watch(
                                             {{ content.title }}
                                         </span>
                                         <span
-                                            v-if="!canOpenContent(index) && !completedAt(content.id)"
+                                            v-if="!canOpenContent(index)"
                                             class="shrink-0 text-white text-xs"
                                             aria-label="Terkunci"
                                             >🔒</span

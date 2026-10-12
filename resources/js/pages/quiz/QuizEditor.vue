@@ -20,7 +20,7 @@
           <label class="field">Judul Quiz<input v-model="form.title" maxlength="150" placeholder="Contoh: K3 atau Produk Gadai" required><small class="muted">Maksimal 150 karakter.</small></label>
           <div class="form-grid">
             <label class="field">Durasi pengerjaan (menit)<input v-model.number="form.duration_minutes" type="number" min="1" max="1440" required></label>
-            <label class="field">Nilai minimal untuk lulus<input v-model.number="form.passing_grade" type="number" min="0" :max="Math.min(100, totalQuestionWeight)" step="0.01" :aria-invalid="!!gradeError"><small class="muted">Total bobot: {{ totalQuestionWeight }} poin. Nilai minimal lulus tidak boleh melebihi total bobot pertanyaan.</small><small v-if="gradeError" class="error" role="alert">{{ gradeError }}</small></label>
+            <label class="field">Nilai minimal untuk lulus (0–100)<input v-model.number="form.passing_grade" type="number" min="0" max="100" step="0.01" :aria-invalid="!!gradeError"><small class="muted">Nilai akhir = poin yang diperoleh ÷ total bobot soal yang dikerjakan × 100. Total bobot soal terpilih: {{ totalQuestionWeight }} poin; tidak harus 100. Contoh: 4 benar dari 5 soal berbobot sama menghasilkan nilai 80.</small><small v-if="gradeError" class="error" role="alert">{{ gradeError }}</small></label>
           </div>
           <label class="field">Course
             <select v-model="form.course_id" :disabled="embedded || form.course_locked" required>
@@ -67,6 +67,7 @@
         <p v-if="!quizQuestions.length" class="quiz-empty">Belum ada soal. Buat soal baru atau pilih dari bank soal.</p>
         <article v-for="(q,index) in quizQuestions" :key="q.id" class="question-card-item stack">
           <div class="row quiz-section-heading"><h3 class="prewrap">{{ index + 1 }}. {{ q.question }}</h3><span class="muted">{{ typeLabels[q.type] }} · {{ q.weight }} poin</span></div>
+          <img v-if="q.image_url" :src="q.image_url" alt="Gambar soal" class="question-image">
           <div v-if="q.options.length" class="quick-choice-grid"><div v-for="(o,i) in q.options" :key="i" class="quick-choice-item" :class="{correct:!!o.is_correct, incorrect:!o.is_correct}"><span class="letter">{{ letter(i) }}</span><span class="prewrap">{{ o.text }}</span><small>{{ o.is_correct ? 'Jawaban benar' : 'Jawaban salah' }}</small></div></div>
           <p v-else class="muted">Jawaban uraian dinilai oleh pengajar.</p>
           <div class="quiz-explanation stack">
@@ -93,12 +94,13 @@
       </footer>
     </template>
 
-    <QuizDialog v-if="modal" :title="modalTitle" :busy="modalBusy || busy" @close="closeModal">
+    <QuizDialog v-if="modal" :title="modalTitle" :busy="modalBusy || busy || imageUploading" @close="closeModal">
       <div v-if="modalError" class="error" role="alert">{{ modalError }}</div>
       <template v-if="modal === 'question'">
         <form class="stack" @submit.prevent="saveQuestion(false)">
           <fieldset :disabled="modalBusy" class="stack quiz-fieldset">
             <label class="field">Pertanyaan<textarea v-model="questionForm.question" maxlength="20000" rows="3" autofocus required></textarea></label>
+            <QuestionImageInput v-model="questionForm.image_path" v-model:image-url="questionForm.image_url" @busy="imageUploading = $event" />
             <label class="field">Jenis soal<select v-model="questionForm.type" @change="changeQuestionType"><option v-for="(label,type) in typeLabels" :key="type" :value="type">{{ label }}</option></select></label>
             <div v-if="questionForm.type !== 'essay'" class="stack">
               <p class="muted">{{ questionForm.type === 'multiple_answer' ? 'Centang semua jawaban yang benar.' : 'Pilih satu jawaban yang benar.' }}</p>
@@ -113,7 +115,7 @@
             <label class="field">Penjelasan jawaban (opsional)<textarea v-model="questionForm.explanation" maxlength="20000" placeholder="Jelaskan alasan jawaban yang benar."></textarea><small class="muted">Ditampilkan pada hasil jika Tampilkan penjelasan diaktifkan.</small></label>
             <details class="quiz-details"><summary>Pengaturan Soal</summary><div class="stack"><label class="field">Bank soal<select v-model="questionForm.bank_id"><option :value="null">Bank soal utama</option><option v-for="b in meta.banks" :key="b.id" :value="b.id">{{ b.name }}</option></select></label><label class="field">Tingkat kesulitan<select v-model="questionForm.difficulty"><option value="easy">Mudah</option><option value="medium">Sedang</option><option value="hard">Sulit</option></select></label></div></details>
           </fieldset>
-          <div class="row quiz-modal-actions"><button type="button" :disabled="modalBusy" @click="closeModal">Batal</button><button v-if="editingQuestionIndex === null" type="button" :disabled="modalBusy" @click="saveQuestion(true)">Simpan & Tambah Soal Lagi</button><button type="submit" class="primary" :disabled="modalBusy">{{ modalBusy ? 'Menyimpan...' : 'Simpan Soal' }}</button></div>
+          <div class="row quiz-modal-actions"><button type="button" :disabled="modalBusy || imageUploading" @click="closeModal">Batal</button><button v-if="editingQuestionIndex === null" type="button" :disabled="modalBusy || imageUploading" @click="saveQuestion(true)">Simpan & Tambah Soal Lagi</button><button type="submit" class="primary" :disabled="modalBusy || imageUploading">{{ imageUploading ? 'Mengunggah gambar...' : modalBusy ? 'Menyimpan...' : 'Simpan Soal' }}</button></div>
         </form>
       </template>
       <template v-else-if="modal === 'bank'">
@@ -153,6 +155,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from '@/navigation';
 import { api, errorMessage, localInput, isoDate, dateLabel } from './api';
 import { quizStepError, passingGradeError } from './flow.mjs';
 import { createSaveQueue, parseBulkQuestions, questionPayload } from './authoring.mjs';
+import QuestionImageInput from './QuestionImageInput.vue';
 import QuizDialog from './QuizDialog.vue';
 import './quiz.css';
 
@@ -184,10 +187,11 @@ const saveLabel = computed(() => ({empty:'Belum disimpan',pending:'Ada perubahan
 const selectedCourseName = computed(() => meta.value?.courses.find(c => Number(c.id)===Number(form.value.course_id))?.name || 'Course belum dipilih');
 const quizQuestions = computed(() => form.value.question_ids.map(id => allQuestions.value.find(q => Number(q.id)===Number(id))).filter(Boolean));
 const totalQuestionWeight = computed(() => Math.round(quizQuestions.value.reduce((sum, q) => sum + Number(q.weight), 0) * 100) / 100);
-const gradeError = computed(() => passingGradeError(form.value.passing_grade, quizQuestions.value));
+const gradeError = computed(() => passingGradeError(form.value.passing_grade));
 const typeLabels = {multiple_choice:'Pilihan ganda',multiple_answer:'Pilihan lebih dari satu',true_false:'Benar atau salah',essay:'Uraian'};
 const letter = i => String.fromCharCode(65+i);
 const questionForm = ref({}), editingQuestionIndex = ref(null);
+const imageUploading = ref(false);
 const explanationDirty = ref(new Set());
 watch(explanationDirty, () => {if(explanationDirty.value.size)saveStatus.value='pending';}, {deep:true});
 const questionSearch = ref(''), bankFilter = ref(''), bankSelection = ref([]);
@@ -275,7 +279,7 @@ async function leaveEditor() {
   if (embedded.value) emit('cancel'); else router.push(form.value.course_id ? '/kelas/'+form.value.course_id : '/kelas');
 }
 function openModal(name) { modalError.value=''; modal.value=name; if(name==='bank') bankSelection.value=[]; }
-function closeModal() { if(!busy.value && !modalBusy.value) { modal.value=''; modalError.value=''; } }
+function closeModal() { if(!busy.value && !modalBusy.value && !imageUploading.value) { modal.value=''; modalError.value=''; } }
 function blankQuestion() { return {bank_id:null,question:'',type:'multiple_choice',weight:1,category:'',difficulty:'medium',explanation:'',options:Array.from({length:4},()=>({text:'',is_correct:false}))}; }
 function openQuestion(q=null,index=null) {
   if(form.value.has_attempts) return;
@@ -300,7 +304,7 @@ function setQuestions(ids) {
   if(usedAll || form.value.question_count>ids.length) form.value.question_count=Math.max(1,ids.length);
 }
 async function saveQuestion(another) {
-  if(modalBusy.value || form.value.has_attempts) return;
+  if(modalBusy.value || imageUploading.value || form.value.has_attempts) return;
   modalError.value='';
   const payload=questionPayload(questionForm.value,form.value.course_id);
   if(!payload.question) {modalError.value='Tuliskan pertanyaan terlebih dahulu.';return;}
@@ -313,7 +317,7 @@ async function saveQuestion(another) {
   try {
     // A new version keeps questions already used elsewhere and past answers intact.
     const data=await api('post','questions',payload);
-    cacheQuestions([{...payload,id:data.id}]);
+    cacheQuestions([{...payload,id:data.id,image_url:questionForm.value.image_url || null}]);
     const ids=[...form.value.question_ids];
     if(editingQuestionIndex.value===null)ids.push(data.id); else {explanationDirty.value.delete(ids[editingQuestionIndex.value]);ids[editingQuestionIndex.value]=data.id;}
     setQuestions(ids);
@@ -329,7 +333,7 @@ async function persistExplanation(q) {
   }
   const payload=questionPayload(q,form.value.course_id);
   const data=await api('post','questions',payload);
-  cacheQuestions([{...payload,id:data.id}]);
+  cacheQuestions([{...payload,id:data.id,image_url:q.image_url || null}]);
   setQuestions(form.value.question_ids.map(id=>id===q.id?data.id:id));
   explanationDirty.value.delete(q.id);
 }

@@ -119,6 +119,7 @@
                     style="margin-top: 18px"
                 >
                     <h3>{{ q.position }}. {{ q.question }}</h3>
+                    <img v-if="q.image_url" :src="q.image_url" alt="Gambar soal" class="question-image" />
                     <p v-if="q.type === 'essay'" class="prewrap">
                         {{ q.essay || "Tidak dijawab" }}
                     </p>
@@ -205,6 +206,7 @@
                                 typeLabels[current.type]
                             }}</span>
                         </div>
+                        <img v-if="current.image_url" :src="current.image_url" alt="Gambar soal" class="question-image my-3" />
                         <h2 class="question-text">{{ current.question }}</h2>
                         <div class="stack" style="gap: 12px">
                             <textarea
@@ -314,45 +316,13 @@
                                 {{ i + 1 }}
                             </button>
                         </div>
-                        <div class="stack muted" style="gap: 7px">
-                            <table>
-                              <tbody>
-                                <tr>
-                                    <td
-                                        class="number current"
-                                        style="height: 10px"
-                                    >
-                                        1
-                                    </td>
-                                    <td>Soal aktif</td>
-                                    <td
-                                        class="number answered"
-                                        style="height: 10px"
-                                    >
-                                        2
-                                    </td>
-                                    <td>Dijawab</td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="number flagged"
-                                        style="height: 10px"
-                                    >
-                                        3
-                                    </td>
-                                    <td>Ragu-ragu</td>
-                                    <td class="number seen" style="width: 10px">
-                                        4
-                                    </td>
-                                    <td>Dilewati</td>
-                                </tr>
-                                <tr>
-                                    <td class="number">5</td>
-                                    <td>Belum dibuka</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                        </div>
+                        <ul class="question-legend" aria-label="Keterangan status soal">
+                            <li><span class="number current" aria-hidden="true"></span><span>Soal aktif</span></li>
+                            <li><span class="number answered" aria-hidden="true"></span><span>Dijawab</span></li>
+                            <li><span class="number flagged" aria-hidden="true"></span><span>Ragu-ragu</span></li>
+                            <li><span class="number seen" aria-hidden="true"></span><span>Dilewati</span></li>
+                            <li><span class="number" aria-hidden="true"></span><span>Belum dibuka</span></li>
+                        </ul>
                         <div class="divider"></div>
                         <p class="muted">
                             {{ questions.length - answered }} belum dijawab ·
@@ -436,8 +406,8 @@ const returnLink = computed(() => {
         ? {
               path: "/student/kelas/" + course,
               query: /^\d+$/.test(String(route.query.content || ""))
-                  ? { content: route.query.content }
-                  : {},
+                  ? { content: route.query.content, ...(attempt.value?.batch_id ? { batch_id: attempt.value.batch_id } : {}) }
+                  : (attempt.value?.batch_id ? { batch_id: attempt.value.batch_id } : {}),
           }
         : "/student/kelas";
 });

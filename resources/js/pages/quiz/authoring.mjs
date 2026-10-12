@@ -35,6 +35,7 @@ export function questionPayload(question, courseId) {
     return {
         bank_id: question.bank_id || null, course_id: courseId || question.course_id || null,
         question: question.question.trim(), type: question.type, weight: Number(question.weight),
+        image_path: question.image_path || null,
         category: question.category?.trim() || null, topic: question.topic || null,
         difficulty: question.difficulty || 'medium', explanation: question.explanation || null,
         options: question.type === 'essay' ? [] : question.options.map(o => ({ text: o.text.trim(), is_correct: !!o.is_correct })),

@@ -67,12 +67,29 @@ class AnnouncementController extends Controller
         $jbt = Session::get('auth.idgrup');
         $cabang = Session::get('auth.cabang');
 
-        $result = $this->announcementService->getAnnouncementDetails($menu_id, $jbt, $cabang);
+        $validated = $request->validate([
+            'page' => 'sometimes|integer|min:1',
+            'include_regions' => 'sometimes|boolean',
+            'regions_only' => 'sometimes|boolean',
+        ]);
+        if ($request->boolean('regions_only')) {
+            Menu::findOrFail($menu_id);
+            $documentIds = Announcement::forUser($jbt, $cabang)->where('submenu_id', $menu_id)->pluck('id');
+            if ($documentIds->isEmpty()) {
+                return response()->json((object) []);
+            }
+            return response()->json(\App\Models\DocumentRegion::query()
+                ->whereIn('document_id', $documentIds)
+                ->get(['document_id', 'regional_id'])->groupBy('document_id'));
+        }
+        $page = isset($validated['page']) ? (int) $validated['page'] : null;
+        $result = $this->announcementService->getAnnouncementDetails($menu_id, $jbt, $cabang, $page, $request->boolean('include_regions', true));
 
         return response()->json([
             'success' => true,
             'detail' => $result['detail'],
-            'items' => AnnouncementResource::collection($result['items'])
+            'items' => AnnouncementResource::collection($result['items']),
+            'next_page' => $page !== null && $result['items']->count() === 20 ? $page + 1 : null,
         ]);
     }
 

@@ -19,6 +19,9 @@ Route::prefix('api/quiz')->middleware(['session.auth', \App\Http\Middleware\Quiz
     Route::post('banks', [Manage::class, 'bank']);
     Route::get('questions', [Manage::class, 'questions']);
     Route::post('questions', [Manage::class, 'saveQuestion']);
+    Route::post('question-images', [Manage::class, 'uploadQuestionImage']);
+    Route::get('question-images/{path}', [Manage::class, 'showQuestionImage'])
+        ->where('path', '[0-9]+/[A-Za-z0-9]+\.(?:jpg|jpeg|png|webp)')->name('quiz.question-image');
     Route::post('questions/replace-one', [Manage::class, 'replaceOneQuestion']);
     Route::post('questions/bulk', [Manage::class, 'saveQuestionsBulk']);
     Route::put('questions/{id}', [Manage::class, 'saveQuestion']);

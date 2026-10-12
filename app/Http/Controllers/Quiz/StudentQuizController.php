@@ -19,6 +19,13 @@ class StudentQuizController extends Controller
     public function index(Request $request)
     {
         $user = $this->service->identity($request);
+        $context = $request->validate(['batch_id' => 'nullable|integer|min:1']);
+        $batchId = $context['batch_id'] ?? null;
+        $batchCourses = null;
+        if ($batchId) {
+            abort_unless(DB::table('training_batch_members')->where('batch_id', $batchId)->where('username', $user->username)->exists(), 403);
+            $batchCourses = DB::table('training_batch_courses')->where('batch_id', $batchId)->pluck('course_id');
+        }
         $quizzes = DB::table('quizzes')->where('status', '!=', 'DRAFT')->where(function ($q) use ($user) {
             $q->whereIn('course_id', DB::table('courses')->select('id'))
                 ->orWhere(function ($legacy) use ($user) {
@@ -30,16 +37,19 @@ class StudentQuizController extends Controller
         })->orderByDesc('id')->get();
         $items = [];
         foreach ($quizzes as $quiz) {
+            if ($batchCourses !== null && !$batchCourses->contains($quiz->course_id)) continue;
             if (!$this->service->assigned($quiz, $user)) {
                 continue;
             }
             foreach (DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id)->where('status', 'IN_PROGRESS')->pluck('id') as $id) {
                 $this->service->expire($id);
             }
-            $attempts = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id)->orderByDesc('attempt_number')->get(['id', 'status', 'attempt_number']);
+            $attemptQuery = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id)->orderByDesc('attempt_number');
+            $attempts = app(\App\Services\Quiz\AttemptHistory::class)->scope($attemptQuery, $batchId)->get(['id', 'status', 'attempt_number']);
             $settings = $this->service->settings($quiz, $user->id);
             $active = $attempts->firstWhere('status', 'IN_PROGRESS');
             $remaining = !$settings['maximum'] || $attempts->count() < $settings['maximum'];
+            $sequenceLocked = $user->role === 'student' && !app(\App\Services\CourseSequence::class)->quizUnlocked($quiz, $user->username);
             $status = $active ? 'Sedang Dikerjakan' : ($attempts->count() && !$remaining ? 'Selesai' : (($settings['from'] && now()->lt($settings['from'])) ? 'Belum Dimulai' : (($settings['until'] && now()->gte($settings['until'])) || $quiz->status === 'CLOSED' ? 'Expired' : 'Tersedia')));
             $items[] = [
                 'id' => $quiz->id,
@@ -55,7 +65,8 @@ class StudentQuizController extends Controller
                 'available_from' => $settings['from'] ? $settings['from']->toIso8601String() : null,
                 'available_until' => $settings['until'] ? $settings['until']->toIso8601String() : null,
                 'status' => $status,
-                'can_start' => $status === 'Tersedia',
+                'can_start' => !$sequenceLocked && $status === 'Tersedia',
+                'sequence_locked' => $sequenceLocked,
                 'active_attempt' => $active->id ?? null,
                 'maximum_attempt' => $settings['maximum'],
                 'attempts' => $attempts,
@@ -67,7 +78,8 @@ class StudentQuizController extends Controller
     public function start(Request $r, $quiz)
     {
         $user = $this->service->identity($r);
-        $id = $this->service->start($this->service->quiz($quiz), $user);
+        $data = $r->validate(['batch_id' => 'nullable|integer|min:1']);
+        $id = $this->service->start($this->service->quiz($quiz), $user, $data['batch_id'] ?? null);
         return $this->service->payload($this->service->attempt($id, $user));
     }
 
@@ -99,8 +111,8 @@ class StudentQuizController extends Controller
             }
             $aq = DB::table('quiz_attempt_questions')->where('attempt_id', $a->id)->where('id', $question)->first();
             abort_unless($aq, 404);
-            $q = DB::table('questions')->find($aq->question_id);
-            $allowed = DB::table('question_options')->where('question_id', $q->id)->pluck('id')->all();
+            $q = $this->service->answerRows($a->id)->firstWhere('id', $aq->id);
+            $allowed = $this->service->optionsForAttempt($a->id, $aq->question_id)->pluck('id')->all();
             abort_if(count(array_diff($data['selected_options'], $allowed)), 422, 'Pilihan jawaban tidak valid.');
             abort_if($q->type !== 'multiple_answer' && count($data['selected_options']) > 1, 422);
             abort_if($q->type === 'essay' && count($data['selected_options']), 422);

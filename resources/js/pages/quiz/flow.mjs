@@ -31,9 +31,7 @@ export function quizStepError(form, step) {
     return '';
 }
 
-export function passingGradeError(grade, questions) {
-    const total = Math.round(questions.reduce((sum, q) => sum + Number(q.weight), 0) * 100) / 100;
-    if (total > 100) return `Total bobot soal ${total} poin melebihi skala nilai 100. Kurangi bobot soal.`;
-    if (Number(grade) > total) return `Nilai minimal lulus tidak boleh melebihi total bobot soal (${total} poin).`;
+export function passingGradeError(grade) {
+    if (grade === null || grade === undefined || String(grade).trim() === '' || !Number.isFinite(Number(grade)) || Number(grade) < 0 || Number(grade) > 100) return 'Nilai minimal lulus harus antara 0 dan 100.';
     return '';
 }

@@ -1,20 +1,21 @@
 <template>
-    <main class="quiz-app stack">
-        <header class="topbar">
-            <div>
-                <h1>Master Kuis</h1>
-                <p class="muted">
-                    Siapkan evaluasi, kelola peserta, dan pantau hasil belajar.
-                </p>
+    <main class="quiz-app stack workspace w-full min-w-0" :aria-busy="loading">
+        <header class="workspace-hero"><div><span class="workspace-eyebrow">PUSAT EVALUASI</span><h1>Bank Soal & Peserta</h1><p>Soal yang tertata. Evaluasi yang bermakna.<br />Kelola pertanyaan, temukan peserta, dan telusuri hasil belajar.</p></div><router-link to="/batch-pelatihan" class="workspace-hero-link">Kelola batch </router-link></header>
+        <div v-if="loading || meta" class="workspace-stats">
+            <div v-for="stat in stats" :key="stat.label">
+                <span class="stat-icon" :class="stat.color"><WorkspaceIcon :name="stat.icon" /></span>
+                <div><strong :class="{ 'loading-placeholder loading-count': loading }"><span :class="{ invisible: loading }">{{ stat.value }}</span></strong><small>{{ stat.label }}</small></div>
             </div>
-        </header>
-        <div v-if="error" class="error" role="alert">{{ error }}</div>
+        </div>
+        <div v-if="error" class="error" role="alert">{{ error }} <button v-if="!meta" :disabled="loading" @click="retryLoad">Coba lagi</button></div>
         <div v-if="message" class="success" role="status">{{ message }}</div>
-        <nav class="tabs">
+        <nav class="tabs workspace-tabs" aria-label="Bagian pengelolaan evaluasi">
             <button
-                v-for="t in ['Bank Soal']"
+                v-for="t in ['Bank Soal', 'Peserta', 'Riwayat Kuis']"
                 :key="t"
                 :class="{ selected: tab === t }"
+                :aria-pressed="tab === t"
+                :disabled="loading || !meta"
                 @click="tab = t"
             >
                 {{ t }}</button
@@ -22,14 +23,14 @@
                 >Pembelajaran Peserta</router-link
             >
         </nav>
-        <p v-if="loading" class="empty">Memuat data…</p>
-        <template v-else-if="meta">
+        <p v-if="loading" class="sr-only" role="status">Memuat bank soal dan peserta...</p>
+        <template v-if="loading || meta">
             <template v-if="tab === 'Bank Soal'"
                 ><details class="panel bank-create mb-3">
-                    <summary>
+                    <summary :aria-disabled="loading" @click="loading && $event.preventDefault()">
                         Buat bank soal baru
                         <span class="muted"
-                            >{{ meta.banks.length }} bank tersedia</span
+                            >{{ loading ? '...' : displayMeta.banks.length }} bank tersedia</span
                         >
                     </summary>
                     <form
@@ -60,7 +61,7 @@
                             <header class="row question-dialog-header">
                                 <h2 id="question-dialog-title">
                                     {{
-                                        question.id ? "Edit Soal" : "Buat Soal"
+                                        question.id ? (question.is_used ? "Edit Versi Baru" : "Edit Soal") : "Buat Soal"
                                     }}
                                 </h2>
                                 <button
@@ -75,6 +76,9 @@
                             <p v-if="error" class="error" role="alert">
                                 {{ error }}
                             </p>
+                            <p v-if="question.id" class="muted">
+                                {{ question.is_used ? "Soal ini sudah digunakan. Perubahan akan disimpan sebagai soal baru di bank soal. Pilih versi baru tersebut di editor kuis untuk menggunakannya; kuis dan riwayat jawaban lama tetap memakai soal sebelumnya." : "Jika soal sudah digunakan saat disimpan, perubahan akan dibuat sebagai versi baru agar riwayat jawaban tetap aman." }}
+                            </p>
                             <form class="stack" @submit.prevent="saveQuestion">
                                 <label class="field"
                                     >Bank soal<select
@@ -85,7 +89,7 @@
                                             Pilih bank soal
                                         </option>
                                         <option
-                                            v-for="b in meta.banks"
+                                            v-for="b in displayMeta.banks"
                                             :value="b.id"
                                             :key="b.id"
                                         >
@@ -127,6 +131,7 @@
                                         maxlength="20000"
                                     ></textarea>
                                 </label>
+                                <QuestionImageInput v-model="question.image_path" v-model:image-url="question.image_url" @busy="imageUploading = $event" />
                                 <div
                                     v-if="question.type !== 'essay'"
                                     class="stack"
@@ -204,7 +209,7 @@
                                         >
                                             <option :value="null">Umum</option>
                                             <option
-                                                v-for="c in meta.courses"
+                                                v-for="c in displayMeta.courses"
                                                 :key="c.id"
                                                 :value="c.id"
                                             >
@@ -221,9 +226,9 @@
                                     ></textarea>
                                 </label>
                                 <div class="row">
-                                    <button class="primary" :disabled="busy">
+                                    <button class="primary" :disabled="busy || imageUploading">
                                         {{
-                                            busy ? "Menyimpan…" : "Simpan Soal"
+                                            busy ? "Menyimpan…" : (question.id && question.is_used ? "Simpan Versi Baru" : "Simpan Soal")
                                         }}</button
                                     ><button
                                         type="button"
@@ -242,7 +247,7 @@
                                 <h2>
                                     Daftar Soal
                                     <span class="badge">{{
-                                        questions.length
+                                        (loading ? '...' : questions.length)
                                     }}</span>
                                 </h2>
                                 <p class="muted">
@@ -252,17 +257,17 @@
                             </div>
                             <button
                                 class="primary"
-                                :disabled="busy || !meta.banks.length"
+                                :disabled="loading || busy || !displayMeta.banks.length"
                                 @click="createQuestion"
                             >
                                 + Tambah Soal
                             </button>
                         </header>
-                        <p v-if="!meta.banks.length" class="muted">
+                        <p v-if="!loading && !displayMeta.banks.length" class="muted">
                             Buat bank soal terlebih dahulu melalui panel di
                             atas.
                         </p>
-                        <div class="question-filters">
+                        <fieldset class="question-filters" :disabled="loading" aria-label="Filter daftar soal">
                             <label class="field"
                                 >Cari soal
                                 <input
@@ -276,7 +281,7 @@
                                 >
                                     <option value="">Semua bank</option>
                                     <option
-                                        v-for="b in meta.banks"
+                                        v-for="b in displayMeta.banks"
                                         :value="b.id"
                                         :key="b.id"
                                     >
@@ -304,10 +309,10 @@
                                     <option value="hard">Sulit</option>
                                 </select></label
                             >
-                        </div>
+                        </fieldset>
                         <div class="row question-library-header">
                             <p class="muted" role="status">
-                                {{ filteredQuestions.length }} soal ditemukan
+                                {{ loading ? '...' : filteredQuestions.length }} soal ditemukan
                             </p>
                             <button
                                 v-if="
@@ -327,6 +332,16 @@
                             tabindex="0"
                             aria-label="Daftar soal"
                         >
+                            <template v-if="loading">
+                                <article v-for="n in pageSize" :key="`loading-${n}`" class="question-card manage-loading" aria-hidden="true">
+                                    <div class="question-copy">
+                                        <div class="row"><span class="badge loading-placeholder"><span class="invisible">Pilihan tunggal</span></span><span class="muted loading-placeholder"><span class="invisible">Sedang</span></span></div>
+                                        <p class="question-text loading-placeholder"><span class="invisible">Pertanyaan sedang dimuat dari bank soal.</span></p>
+                                        <p class="muted loading-placeholder"><span class="invisible">Bank soal · Kategori · Bobot</span></p>
+                                    </div>
+                                    <div class="row question-actions"><button disabled tabindex="-1">Edit</button><button disabled tabindex="-1">Salin</button></div>
+                                </article>
+                            </template>
                             <article
                                 v-for="(q, index) in pagedQuestions"
                                 :key="q.id"
@@ -347,6 +362,7 @@
                                     <p class="question-text">
                                         {{ q.question }}
                                     </p>
+                                    <img v-if="q.image_url" :src="q.image_url" alt="Gambar soal" class="question-image" loading="lazy" />
                                     <details
                                         v-if="
                                             q.question.length > 180 ||
@@ -354,7 +370,7 @@
                                         "
                                         class="question-full"
                                     >
-                                        <summary>
+                                        <summary :aria-disabled="loading" @click="loading && $event.preventDefault()">
                                             Lihat pertanyaan lengkap
                                         </summary>
                                         <p>{{ q.question }}</p>
@@ -372,7 +388,7 @@
                                         :disabled="busy"
                                         @click="editQuestion(q)"
                                     >
-                                        Edit</button
+                                        {{ q.is_used ? "Edit Versi Baru" : "Edit" }}</button
                                     ><button
                                         :disabled="busy"
                                         @click="editQuestion(q, true)"
@@ -381,7 +397,7 @@
                                     </button>
                                 </div>
                             </article>
-                            <p v-if="!filteredQuestions.length" class="empty">
+                            <p v-if="!loading && !filteredQuestions.length" class="empty">
                                 {{
                                     questions.length
                                         ? "Tidak ada soal yang cocok. Coba ubah filter atau kata pencarian."
@@ -394,7 +410,7 @@
                             aria-label="Halaman daftar soal"
                         >
                             <label class="row"
-                                >Per halaman<select v-model.number="pageSize">
+                                >Per halaman<select v-model.number="pageSize" :disabled="loading">
                                     <option :value="5">5</option>
                                     <option :value="10">10</option>
                                     <option :value="20">20</option>
@@ -415,7 +431,7 @@
                             >
                             <div class="row">
                                 <button
-                                    :disabled="page === 1"
+                                    :disabled="loading || page === 1"
                                     @click="page--"
                                     aria-label="Halaman sebelumnya"
                                 >
@@ -423,7 +439,7 @@
                                 ><span
                                     >Halaman {{ page }} / {{ totalPages }}</span
                                 ><button
-                                    :disabled="page >= totalPages"
+                                    :disabled="loading || page >= totalPages"
                                     @click="page++"
                                     aria-label="Halaman berikutnya"
                                 >
@@ -434,141 +450,20 @@
                     </section>
                 </div></template
             >
-            <template v-if="tab === 'Kelas & Student'"
-                ><div class="grid">
-                    <section class="panel stack">
-                        <h2>
-                            {{ classForm.id ? "Edit Kelas" : "Buat Kelas" }}
-                        </h2>
-                        <form class="stack" @submit.prevent="saveClass">
-                            <label class="field"
-                                >Nama kelas<input
-                                    v-model="classForm.name"
-                                    required
-                                    maxlength="255"
-                                    placeholder="Gadai Batch 01" /></label
-                            ><label class="field"
-                                >Cari student<input
-                                    v-model="studentSearch"
-                                    placeholder="Nama atau username"
-                            /></label>
-                            <div class="scroll-list">
-                                <label
-                                    v-for="s in filteredStudents"
-                                    :key="s.id"
-                                    class="check"
-                                    ><input
-                                        type="checkbox"
-                                        v-model="classForm.student_ids"
-                                        :value="s.id"
-                                    />{{ s.name }} ({{ s.username }})</label
-                                >
-                            </div>
-                            <p class="muted">
-                                {{ classForm.student_ids.length }} student
-                                dipilih. Pengguna muncul setelah login pertama
-                                atau didaftarkan admin.
-                            </p>
-                            <div class="row">
-                                <button class="primary" :disabled="busy">
-                                    Simpan Kelas</button
-                                ><button
-                                    type="button"
-                                    @click="
-                                        classForm = {
-                                            name: '',
-                                            student_ids: [],
-                                        }
-                                    "
-                                >
-                                    Reset
-                                </button>
-                            </div>
-                        </form>
-                        <div class="divider"></div>
-                        <article
-                            v-for="c in meta.classes"
-                            :key="c.id"
-                            class="row"
-                            style="justify-content: space-between"
-                        >
-                            <div>
-                                <h3>{{ c.name }}</h3>
-                                <p class="muted">
-                                    {{ c.student_ids.length }} student
-                                </p>
-                            </div>
-                            <button
-                                @click="
-                                    classForm = JSON.parse(JSON.stringify(c))
-                                "
-                            >
-                                Edit
-                            </button>
-                        </article>
-                    </section>
-                    <section class="panel stack">
-                        <h2>Pengguna LMS</h2>
-                        <p class="muted">
-                            Pemetaan menggunakan username login karyawan yang
-                            sudah ada.
-                        </p>
-                        <form
-                            v-if="meta.user.role === 'admin'"
-                            class="stack"
-                            @submit.prevent="saveUser"
-                        >
-                            <label class="field"
-                                >Username karyawan<input
-                                    v-model="userForm.username"
-                                    required
-                                    maxlength="150" /></label
-                            ><label class="field"
-                                >Nama<input
-                                    v-model="userForm.name"
-                                    required
-                                    maxlength="255" /></label
-                            ><label class="field"
-                                >Role<select v-model="userForm.role">
-                                    <option value="student">Student</option>
-                                    <option value="trainer">Trainer</option>
-                                    <option value="teacher">
-                                        Teacher (legacy)
-                                    </option>
-                                    <option value="admin">Admin</option>
-                                </select></label
-                            ><button class="primary" :disabled="busy">
-                                Simpan Pengguna / Role
-                            </button>
-                        </form>
-                        <div class="table-wrap">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Nama</th>
-                                        <th>Username</th>
-                                        <th>Role</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="s in meta.students" :key="s.id">
-                                        <td>{{ s.name }}</td>
-                                        <td>{{ s.username }}</td>
-                                        <td>{{ s.role }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                </div></template
-            >
+            <section v-if="tab === 'Peserta'" class="panel participant-library"><header class="topbar"><div><h2>Direktori Peserta</h2><p class="muted">Data karyawan aktif, sesuai nama dan jabatan dari sistem karyawan.</p></div><router-link to="/batch-pelatihan" class="button primary">Atur penugasan batch &#8594;</router-link></header><label class="field">Cari karyawan<input v-model="studentSearch" placeholder="Cari nama atau username..." /></label><p class="muted">{{ filteredStudents.length }} karyawan ditemukan</p><div class="participant-grid"><article v-for="student in pagedStudents" :key="student.id" class="participant-card"><div class="avatar">{{ student.name?.slice(0, 1).toUpperCase() }}</div><div><h3>{{ student.name }}</h3><p class="muted">{{ student.username }}</p><span class="badge">{{ student.role }}</span></div><router-link :to="`/riwayat-belajar?username=${encodeURIComponent(student.username)}`" class="participant-history" :aria-label="`Riwayat ${student.name}`">&#8599;</router-link></article></div><p v-if="!filteredStudents.length" class="empty">Karyawan tidak ditemukan. Coba nama atau username lain.</p><nav class="question-pagination" aria-label="Halaman karyawan"><button :disabled="studentPage === 1" @click="studentPage--">Sebelumnya</button><span>{{ studentPage }} / {{ studentPages }}</span><button :disabled="studentPage >= studentPages" @click="studentPage++">Berikutnya</button></nav></section>
+            <LearningHistory v-if="tab === 'Riwayat Kuis'" />
         </template>
     </main>
 </template>
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from "vue";
-import { useRoute } from "@/navigation";
+import { useRoute, onBeforeRouteLeave } from "@/navigation";
 import { api, errorMessage } from "./api";
+import WorkspaceIcon from '@/components/WorkspaceIcon.vue';
+import LearningHistory from '@/components/LearningHistory.vue';
+import '@/styles/learning-workspace.css';
+import QuestionImageInput from './QuestionImageInput.vue';
+const imageUploading = ref(false);
 import "./quiz.css";
 const route = useRoute(),
     tab = ref("Bank Soal"),
@@ -582,6 +477,13 @@ const route = useRoute(),
     search = ref(""),
     bankFilter = ref(""),
     studentSearch = ref("");
+const displayMeta = computed(() => meta.value ?? { banks: [], courses: [], students: [] });
+const stats = computed(() => [
+    { label: 'Bank soal', icon: 'book', color: '', value: displayMeta.value.banks.length },
+    { label: 'Pertanyaan tersedia', icon: 'question', color: 'mint', value: questions.value.length },
+    { label: 'Soal digunakan', icon: 'check', color: 'peach', value: questions.value.filter(q => q.is_used).length },
+    { label: 'Karyawan aktif', icon: 'users', color: 'sky', value: displayMeta.value.students.length },
+]);
 const page = ref(1),
     pageSize = ref(5),
     typeFilter = ref(""),
@@ -610,7 +512,7 @@ function createQuestion() {
     openQuestion();
 }
 function closeQuestion() {
-    if (busy.value) return;
+    if (busy.value || imageUploading.value) return;
     if (
         JSON.stringify(question.value) !== initialQuestion &&
         !window.confirm("Tutup dan buang perubahan soal yang belum disimpan?")
@@ -628,6 +530,8 @@ const newQuestion = () => ({
     bank_id: meta.value?.banks[0]?.id || "",
     course_id: null,
     question: "",
+    image_path: null,
+    image_url: null,
     type: "multiple_choice",
     weight: 1,
     category: "",
@@ -636,9 +540,12 @@ const newQuestion = () => ({
     explanation: "",
     options: Array.from({ length: 4 }, () => ({ text: "", is_correct: false })),
 });
-const question = ref(newQuestion()),
-    classForm = ref({ name: "", student_ids: [] }),
-    userForm = ref({ username: "", name: "", role: "student" });
+const question = ref(newQuestion());
+onBeforeRouteLeave(() => {
+    if (!questionDialog.value?.open) return true;
+    if (busy.value || imageUploading.value) return false;
+    return JSON.stringify(question.value) === initialQuestion || window.confirm('Tinggalkan form soal? Perubahan belum disimpan.');
+});
 const filteredQuestions = computed(() =>
     questions.value.filter(
         (q) =>
@@ -682,6 +589,12 @@ const filteredStudents = computed(() =>
             .includes(studentSearch.value.toLowerCase()),
     ),
 );
+const studentPage = ref(1);
+const studentPages = computed(() => Math.max(1, Math.ceil(filteredStudents.value.length / 12)));
+const pagedStudents = computed(() => filteredStudents.value.slice((studentPage.value - 1) * 12, studentPage.value * 12));
+watch(studentSearch, () => { studentPage.value = 1; });
+watch(studentPages, max => { studentPage.value = Math.min(studentPage.value, max); });
+async function retryLoad() { loading.value = true; error.value = ""; try { await load(); } catch (e) { error.value = errorMessage(e); } finally { loading.value = false; } }
 async function load() {
     const data = await Promise.all([
         api("get", "metadata"),
@@ -694,9 +607,9 @@ async function action(fn, msg) {
     error.value = "";
     message.value = "";
     try {
-        await fn();
+        const resultMessage = await fn();
         await load();
-        message.value = msg;
+        message.value = typeof resultMessage === "string" ? resultMessage : msg;
     } catch (e) {
         error.value = errorMessage(e);
     } finally {
@@ -725,37 +638,37 @@ const saveBank = () =>
         bankName.value = "";
     }, "Bank soal dibuat.");
 const saveQuestion = () =>
-    action(async () => {
-        await api(
+    !imageUploading.value && action(async () => {
+        const saved = await api(
             question.value.id ? "put" : "post",
             question.value.id ? `questions/${question.value.id}` : "questions",
-            question.value,
+            { ...question.value, version_if_used: true },
         );
         question.value = newQuestion();
         questionDialog.value.close();
+        return saved.created_version
+            ? "Versi baru soal disimpan di bank soal. Pilih versi baru di editor kuis untuk menggunakannya. Kuis dan riwayat lama tetap memakai soal sebelumnya."
+            : "Soal disimpan.";
     }, "Soal disimpan.");
-const saveClass = () =>
-    action(async () => {
-        await api("post", "classes", classForm.value);
-        classForm.value = { name: "", student_ids: [] };
-    }, "Kelas disimpan.");
-const saveUser = () =>
-    action(async () => {
-        await api("post", "users", userForm.value);
-        userForm.value = { username: "", name: "", role: "student" };
-    }, "Pengguna disimpan.");
-onMounted(async () => {
-    try {
-        await load();
-    } catch (e) {
-        error.value = errorMessage(e);
-    } finally {
-        loading.value = false;
-    }
-});
+onMounted(retryLoad);
 </script>
 
 <style scoped>
+.loading-placeholder {
+    display: block;
+    border-radius: 8px;
+    background: linear-gradient(100deg, #eee8f5 25%, #faf7ff 50%, #eee8f5 75%);
+    background-size: 200% 100%;
+    animation: manage-loading 1.6s ease-in-out infinite;
+}
+.loading-count { width: 42px; max-width: 100%; }
+.manage-loading .question-copy { width: 100%; }
+.manage-loading .question-text { width: 90%; }
+.manage-loading .question-copy > .muted { width: 65%; }
+@keyframes manage-loading { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+    .loading-placeholder { animation: none; }
+}
 .bank-create summary {
     cursor: pointer;
     font-weight: 650;
@@ -771,6 +684,7 @@ onMounted(async () => {
     margin-bottom: 6px;
 }
 .question-filters {
+    min-width: 0;
     display: grid;
     grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 12px;
@@ -844,7 +758,6 @@ onMounted(async () => {
     padding: 0;
     border: 0;
     border-radius: 20px;
-    margin: auto;
     overflow-y: auto;
 }
 .question-dialog::backdrop {

@@ -5,6 +5,18 @@
 @tailwind components;
 @tailwind utilities;
 
+:root { --lms-primary: #662fff; --lms-primary-hover: #5422db; }
+.lms-primary-button { background-color: var(--lms-primary); color: #fff; transition: background-color .2s, opacity .2s; }
+.lms-primary-button:hover:not(:disabled) { background-color: var(--lms-primary-hover); }
+.lms-primary-button:focus-visible { outline: 3px solid #c2acff; outline-offset: 3px; }
+.lms-primary-button:disabled { opacity: .5; cursor: not-allowed; }
+
+
+.lms-secondary-button { background-color: transparent; color: var(--lms-primary); transition: background-color .2s, opacity .2s; border: 1px solid var(--lms-primary);}
+.lms-secondary-button:hover:not(:disabled) { background-color: var(--lms-primary-hover) !important; color:white !important; }
+.lms-secondary-button:focus-visible { outline: 3px solid #c2acff; outline-offset: 3px; }
+.lms-secondary-button:disabled { opacity: .5; cursor: not-allowed; }
+
 
 body {
   font-family: 'Poppins', sans-serif;
@@ -17,7 +29,7 @@ background: #662FFF;
 
 
 body{
-    font-family: "Poppins";
+    font-family: "Poppins", sans-serif;
     color: #060A23;
     display: flex;
     flex-direction: column;

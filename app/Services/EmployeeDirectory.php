@@ -29,6 +29,21 @@ class EmployeeDirectory
         return $this->query()->where('users.is_active', true)->where('users.username', $username)->exists();
     }
 
+    /** Only employee-backed accounts may participate; never expose authentication fields. */
+    public function accounts(?array $usernames = null, bool $activeOnly = true)
+    {
+        return $this->query()
+            ->leftJoin('master.position as position', 'position.position_id', '=', 'employee.position_id')
+            ->when($activeOnly, fn ($query) => $query->where('users.is_active', true))
+            ->when($usernames !== null, fn ($query) => $query->whereIn('users.username', $usernames))
+            ->orderBy('users.full_name')
+            ->get(['users.username', 'users.full_name as name', 'position.position_code as position'])
+            ->map(function ($employee) {
+                $employee->role = RoleAccess::roleForPosition($employee->position);
+                return $employee;
+            });
+    }
+
     public function names(array $usernames)
     {
         if (!$usernames) return collect();

@@ -165,12 +165,14 @@
 </template>
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { useRouter } from "@/navigation";
+import { useRouter, useRoute } from "@/navigation";
+import { apiInstance } from '@/utils/axios';
 import { api, errorMessage, dateLabel } from "../quiz/api";
 import { primaryQuizAction } from "../quiz/flow.mjs";
 import "../quiz/quiz.css";
 const props = defineProps({ content: { type: Object, required: true } }),
     router = useRouter();
+const route = useRoute();
 const quiz = ref(null),
     loading = ref(true),
     starting = ref(false),
@@ -207,14 +209,14 @@ const actionHint = computed(() =>
 );
 const attemptLink = (id) => ({
     path: "/student/quiz/attempt/" + id,
-    query: { course: props.content.course_id, content: props.content.id },
+    query: { course: props.content.course_id, content: props.content.id, ...(route.query.batch_id ? { batch_id: route.query.batch_id } : {}) },
 });
 let requestVersion = 0,
     timer;
 async function load() {
     const version = ++requestVersion;
     try {
-        const data = await api("get", "student");
+        const data = route.query.batch_id ? (await apiInstance.get("/api/quiz/student", { params: { batch_id: route.query.batch_id } })).data : await api("get", "student");
         if (version !== requestVersion) return;
         quiz.value =
             data.quizzes.find(
@@ -251,7 +253,7 @@ async function start() {
     starting.value = true;
     startError.value = "";
     try {
-        const data = await api("post", `${props.content.quiz_id}/start`);
+        const data = await api("post", `${props.content.quiz_id}/start`, route.query.batch_id ? { batch_id: Number(route.query.batch_id) } : {});
         confirmDialog.value.close();
         await router.push(attemptLink(data.id));
     } catch (e) {

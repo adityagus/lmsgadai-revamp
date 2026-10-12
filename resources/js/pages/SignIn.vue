@@ -5,7 +5,6 @@
 
       <div class="relative hidden w-full h-full bg-brand-950 lg:grid lg:w-1/2 url-b">
 
-
         <div class="flex items-center justify-center z-1">
 
           <!-- back to landing page (coming soon) -->
@@ -23,7 +22,7 @@
           <!-- ===== Common Grid Shape Start ===== -->
           <!-- <include src="./partials/common-grid-shape.html"></include> -->
           <img class="w-full h-full object-cover relative"
-            src="https://images.unsplash.com/photo-1540563283646-b6e0f4762a5f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+            src="{{ asset('images/login.jpg') }}"
             alt="">
 
           <!-- <div class="flex flex-col items-center max-w-xs">

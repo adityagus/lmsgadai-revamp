@@ -67,6 +67,21 @@ class CourseProgressTest extends TestCase
         $this->assertDatabaseCount('course_content_progress', 0);
     }
 
+    public function test_completed_lesson_can_be_reopened_without_unlocking_future_unfinished_lessons(): void
+    {
+        DB::table('course_details')->insert(['id' => 4, 'course_id' => 1, 'type' => 'text', 'order' => 3]);
+        DB::table('course_content_progress')->insert([
+            'username' => 'employee-a', 'course_id' => 1, 'content_id' => 4, 'completed_at' => now(),
+        ]);
+        $this->loginAs()->getJson('/contents/4')->assertOk();
+        $this->getJson('/contents/2')->assertForbidden();
+        $this->postJson('/api/courses/1/progress/1/complete')->assertOk();
+        $this->getJson('/contents/1')->assertOk();
+        $this->getJson('/contents/2')->assertOk();
+        $this->getJson('/contents/4')->assertOk();
+        $this->loginAs('employee-b')->getJson('/contents/2')->assertForbidden();
+    }
+
     public function test_native_quiz_requires_submitted_attempt_and_empty_course_is_not_complete(): void
     {
         DB::table('course_details')->where('id', 2)->update(['type' => 'quiz', 'quiz_id' => 7]);

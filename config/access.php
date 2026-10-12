@@ -4,21 +4,22 @@ return [
     // Employee position_code from the verified login session (auth.idgrup).
     'position_roles' => [
         'JBT-032' => 'admin',
-        'JBT-038' => 'admin',
+        'JBT-038' => 'trainer',
         'JBT-037' => 'sop',
         'JBT-039' => 'sop',
         'JBT-040' => 'sop',
         'JBT-SOP' => 'sop',
         'JBT-019' => 'trainer',
-        'JBT-020' => 'sop',
+        'JBT-020' => 'audit',
         '042' => 'trainer',
         'JBT-TRAINER' => 'trainer',
     ],
 
     'groups' => [
-        'manager' => ['admin'],
+        'admin' => ['admin'],
+        'instructor' => ['admin', 'sop', 'trainer'],
         'sop' => ['admin', 'sop'],
-        'documents' => ['admin', 'sop'],
-        'student' => ['student'],
+        'report' => ['admin', 'sop', 'audit'],
+        'guest' => ['student'],
     ],
 ];

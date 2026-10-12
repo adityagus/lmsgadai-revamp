@@ -11,7 +11,7 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button @click="exportToExcel" :disabled="exporting || filteredData.length === 0"
+        <button v-if="!isAudit" @click="exportToExcel" :disabled="exporting || filteredData.length === 0"
           class="inline-flex items-center gap-2 px-5 py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white text-sm font-semibold rounded-xl shadow transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0">
           <svg v-if="!exporting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -159,6 +159,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+const page = usePage();
+const isAudit = computed(() => page.props.auth?.role === 'audit');
 import { getDocumentReport } from '@/services/queries/reportQuery.ts';
 import { exportDocumentReport } from '@/services/mutations/reportMutation.ts';
 
@@ -246,7 +249,7 @@ const formatDate = (dateStr) => {
 };
 
 const exportToExcel = async () => {
-  if (filteredData.value.length === 0 || exporting.value) return;
+  if (isAudit.value || filteredData.value.length === 0 || exporting.value) return;
   try {
     exporting.value = true;
     const response = await exportDocumentReport(filteredData.value);

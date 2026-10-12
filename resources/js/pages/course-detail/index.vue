@@ -10,6 +10,12 @@
       Detail
     </span>
   </div>
+  <CourseDetailSkeleton v-if="isLoading" />
+  <div v-else-if="loadError" role="alert" class="rounded-2xl border border-red-100 bg-white p-6 text-center">
+    <p class="text-red-600">{{ loadError }}</p>
+    <button type="button" class="mt-4 rounded-full bg-[#662FFF] px-5 py-3 text-sm font-semibold text-white" @click="loadCourse">Coba lagi</button>
+  </div>
+  <template v-else>
   <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-[30px] mb-4 sm:mb-6">
     <div>
       <h1 class="font-extrabold text-2xl sm:text-[28px] leading-tight sm:leading-[42px]">
@@ -29,16 +35,17 @@
   </header>
   <section id="CourseInfo" class="flex flex-col lg:flex-row gap-5 lg:gap-[50px] mb-6 sm:mb-8">
 
-    <AnimatedPlaceholder width='100%' height='220px' borderRadius='20px' id="Thumbnail" v-if='!course?.thumbnail_url'
-      class="flex shrink-0 w-full lg:w-[480px] h-[200px] sm:h-[250px] bg-[#D9D9D9] overflow-hidden" />
-
-    <div id="Thumbnail" v-else class="flex shrink-0 w-full lg:w-[480px] h-[200px] sm:h-[250px] rounded-[20px] bg-[#D9D9D9] overflow-hidden">
-      <img :src="course?.thumbnail_url" class="w-full h-full object-cover" alt="thumbnail" />
+    <div id="Thumbnail" class="flex shrink-0 w-full lg:w-[480px] h-[200px] sm:h-[250px] rounded-[20px] bg-[#D9D9D9] overflow-hidden">
+      <img v-if="course.thumbnail_url && !thumbnailFailed" :src="course.thumbnail_url" class="w-full h-full object-cover" :alt="course.name" @error="thumbnailFailed = true" />
+      <div v-else class="flex w-full flex-col items-center justify-center gap-3 bg-purple-50 text-[#662FFF]">
+        <img src="/assets/images/icons/note-favorite-purple.svg" class="h-12 w-12" alt="" />
+        <span class="text-sm font-medium">Gambar kelas belum tersedia</span>
+      </div>
     </div>
     <div class="grid grid-cols-2 gap-3 sm:gap-5 w-full">
       <div class="flex flex-col rounded-[20px] border border-[#CFDBEF] p-4 sm:p-5 gap-2 sm:gap-4">
         <img src="/assets/images/icons/profile-2user-purple.svg" class="w-6 h-6 sm:w-8 sm:h-8" alt="icon" />
-        <p class="font-semibold text-xs sm:text-base" aria-live="polite">{{ totalStudents }} Students</p>
+        <p class="font-semibold text-xs sm:text-base" aria-live="polite">{{ totalStudents ?? '—' }} Students</p>
       </div>
       <div class="flex flex-col rounded-[20px] border border-[#CFDBEF] p-4 sm:p-5 gap-2 sm:gap-4">
         <img src="/assets/images/icons/crown-purple.svg" class="w-6 h-6 sm:w-8 sm:h-8" alt="icon" />
@@ -56,6 +63,7 @@
   </section>
   <CourseParticipants v-if="course.id" :key="course.id" :course-id="course.id" @total-students="totalStudents = $event" />
   <TableContentPage :contents="contents" :courseId="course.id" />
+  </template>
 </template>
 
 <script setup>
@@ -66,7 +74,7 @@ import { getCourseByIdPagination } from '@/services/queries/courseQuery.ts';
 import { onMounted, ref, reactive } from 'vue';
 import { useForm } from 'vee-validate';
 import { mutateContentSchema } from '@/utils/zodSchema';
-import AnimatedPlaceholder from '@/components/AnimatedPlaceholder.vue';
+import CourseDetailSkeleton from './CourseDetailSkeleton.vue';
 
 import "primeicons/primeicons.css";
 
@@ -84,6 +92,9 @@ const { handleSubmit, isSubmitting, values, errors } = useForm({
 const route = useRoute();
 
 const course = ref({});
+const isLoading = ref(true);
+const loadError = ref('');
+const thumbnailFailed = ref(false);
 const totalStudents = ref(null);
 const contents = ref({});
 const props = defineProps({
@@ -109,17 +120,23 @@ const props = defineProps({
   }
 })
 
-onMounted(async () => {
+async function loadCourse() {
+  isLoading.value = true;
+  loadError.value = '';
+  thumbnailFailed.value = false;
+  totalStudents.value = null;
   try {
     const result = await getCourseByIdPagination(route.params.id);
-    console.log("result", result);
     course.value = result.course;
     contents.value = result.contents;
-    console.log("contents", contents);
   } catch (error) {
-    console.log(error);
+    loadError.value = 'Detail kelas gagal dimuat. Silakan coba lagi.';
+  } finally {
+    isLoading.value = false;
   }
-});
+}
+
+onMounted(loadCourse);
 
 // const props = withDefaults(defineProps<Props>(), {
 //   id: 1,

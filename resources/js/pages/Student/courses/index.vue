@@ -5,6 +5,8 @@
       <p class="text-[#838C9D] text-xs sm:text-base mt-1">Lihat semua kelas yang tersedia</p>
     </div>
   </header>
+  <BatchLearning />
+  <div v-if="error" role="alert" class="mt-4 rounded-xl bg-red-50 p-4 text-red-700">{{ error }} <button @click="fetchCourses()">Coba lagi</button></div>
   <section :aria-busy="loading" id="CourseList" class="flex flex-col w-full rounded-2xl sm:rounded-[30px] gap-4  mt-4">
     <!-- Konten utama (CardCourses) saat data sudah siap -->
     <div class="flex w-full items-center justify-center" role="status" aria-live="polite">
@@ -63,12 +65,17 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useCourseList } from '@/composables/useCourseList.mjs';
+import { queryClient } from '@/api/queryClient';
 import { getCourses } from '@/services/queries/courseQuery.ts';
 import { useRouter } from '@/navigation';
 import CardSkeletonStudent from '../../../components/skeletons/CardSkeletonStudent.vue';
+import BatchLearning from '@/components/BatchLearning.vue';
 
 const router = useRouter();
-const { courses, pagination, totalPages, loading, loaded, error, fetchCourses, goToPage } = useCourseList(getCourses);
+const { courses, pagination, totalPages, loading, loaded, error, fetchCourses, goToPage } = useCourseList(async (page) => {
+  await queryClient.invalidateQueries({ queryKey: ['courses', 'list', page], refetchType: 'none' });
+  return getCourses(page);
+});
 
 // Fungsi untuk menuju halaman detail kelas
 const goToDetail = (id) => {

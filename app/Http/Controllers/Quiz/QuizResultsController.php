@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Quiz;
 
 use App\Http\Controllers\Controller;
 use App\Services\Quiz\QuizService;
+use App\Services\Quiz\EmployeeParticipants;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -24,10 +25,15 @@ class QuizResultsController extends Controller
         foreach (DB::table('quiz_attempts')->where('quiz_id', $quiz)->where('status', 'IN_PROGRESS')->pluck('id') as $id) {
             $this->service->expire($id);
         }
-        $attempts = DB::table('quiz_attempts as a')->join('lms_users as u', 'u.id', '=', 'a.student_id')->where('quiz_id', $quiz)->orderBy('u.name')->orderBy('attempt_number')->select('a.*', 'u.name')->get();
+        $attempts = DB::table('quiz_attempts')->where('quiz_id', $quiz)->orderBy('attempt_number')->get();
+        $names = app(EmployeeParticipants::class)->names($attempts->pluck('student_id')->unique());
+        $attempts = $attempts->map(function ($attempt) use ($names) {
+            $attempt->name = $names->get($attempt->student_id, 'Karyawan tidak tersedia');
+            return $attempt;
+        })->sortBy('name')->values();
         $studentIds = DB::table('quiz_students')->where('quiz_id', $quiz)->pluck('student_id')->merge(DB::table('class_students')->whereIn('class_id', DB::table('quiz_classes')->where('quiz_id', $quiz)->select('class_id'))->pluck('student_id'))->merge($attempts->pluck('student_id'))->unique();
         $course = $q->course_id ? DB::table('courses')->find($q->course_id) : null;
-        if ($course) { $studentIds = DB::table('lms_users')->pluck('id'); }
+        if ($course) { $studentIds = app(EmployeeParticipants::class)->all()->pluck('id')->merge($attempts->pluck('student_id'))->unique(); }
         $scores = [];
         $classStats = [];
         foreach ($studentIds as $student) {
@@ -105,6 +111,11 @@ class QuizResultsController extends Controller
             abort_if($data['points'] > $row->weight, 422, 'Nilai melebihi bobot soal.');
             abort_if(!strlen(trim($row->essay ?? '')) && $data['points'] > 0, 422, 'Essay kosong harus bernilai nol.');
             DB::table('student_answers')->where('id', $row->answer_id)->update($data + ['graded_by' => $user->id, 'updated_at' => now()]);
+            if (\Illuminate\Support\Facades\Schema::hasTable('learning_grade_audits')) {
+                DB::table('learning_grade_audits')->insert(['attempt_id' => $a->id, 'answer_id' => $row->answer_id,
+                    'previous_points' => $row->points, 'points' => $data['points'], 'feedback' => $data['feedback'] ?? null,
+                    'graded_by' => $user->username, 'created_at' => now()]);
+            }
             $this->service->recalculate($a->id);
             return ['message' => 'Nilai essay disimpan.'];
         }, 3);

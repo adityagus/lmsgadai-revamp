@@ -40,6 +40,7 @@ class CourseSequence
         $contents = Content::where('course_id', $courseId)->orderBy('order')->orderBy('id')->get();
         if (!$contents->contains('id', $contentId)) return false;
         $completed = $this->completed($contents, $courseId, $username);
+        if (isset($completed[$contentId])) return true;
         foreach ($contents as $content) {
             if ((int) $content->id === $contentId) return true;
             if (!isset($completed[$content->id])) return false;

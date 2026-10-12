@@ -20,15 +20,11 @@ const valid = {title:'Quiz Produk Gadai',duration_minutes:45,passing_grade:75,av
 test('locked course quizzes cannot start or resume through the quiz list', () => {
     assert.deepEqual(primaryQuizAction({ sequence_locked: true, can_start: true, active_attempt: 7 }), { kind: 'unavailable', label: 'Selesaikan materi sebelumnya' });
 });
-test('passing grade cannot exceed the combined question weight', () => {
-    assert.equal(passingGradeError(99, [{weight:40}, {weight:60}]), '');
-    assert.equal(passingGradeError(100, [{weight:40}, {weight:60}]), '');
-    assert.match(passingGradeError(80, [{weight:30}, {weight:45}]), /melebihi.*75 poin/);
-    assert.equal(passingGradeError(0, []), '');
-    assert.match(passingGradeError(1, []), /0 poin/);
-    assert.match(passingGradeError(0.31, [{weight:0.1}, {weight:0.2}]), /0.3 poin/);
-    assert.equal(passingGradeError(0.3, [{weight:0.1}, {weight:0.2}]), '');
-    assert.match(passingGradeError(100, [{weight:101}]), /melebihi/);
+test('passing grade uses the normalized 0 to 100 scale independently of weights', () => {
+    for (const grade of [0, 0.31, 75.01, 80, 100]) assert.equal(passingGradeError(grade), '');
+    for (const grade of [-1, 100.01, NaN, Infinity, '', null, undefined, 'invalid']) {
+        assert.match(passingGradeError(grade), /antara 0 dan 100/);
+    }
 });
 test('publish requires exactly one course even with class or individual assignments', () => {
     assert.equal(quizStepError(valid,0),'');

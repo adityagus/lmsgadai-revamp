@@ -5,12 +5,7 @@ import { mutateQuiz } from '../../services/mutations/quizMutation.ts';
 export const api = (method, path, data) => method.toLowerCase() === 'get'
   ? getQuiz(path)
   : mutateQuiz(method, path, data);
-export const errorMessage = (e) =>
-    Object.values(e.response?.data?.errors || {})
-        .flat()
-        .join(" ") ||
-    e.response?.data?.message ||
-    "Koneksi terputus. Silakan coba kembali.";
+export { errorMessage } from './errors.mjs';
 export const dateLabel = (value) =>
     value
         ? new Date(value).toLocaleString("id-ID", {

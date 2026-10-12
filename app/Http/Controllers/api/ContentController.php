@@ -45,6 +45,12 @@ class ContentController extends Controller
         if (!$content) {
             return response()->json(['message' => 'Content not Found'], 404);
         }
+        app(\App\Services\CourseService::class)->assertAccessible((int) $content->course_id, request());
+        if (\App\Services\RoleAccess::role(request()) === 'student') {
+            app(\App\Services\CourseSequence::class)->assertUnlocked(
+                (int) $content->course_id, (int) $content->id, (string) request()->session()->get('auth.user')
+            );
+        }
         
         $content->user_name = $content->user ? $content->user->name : 'Unknown';
         
@@ -69,6 +75,7 @@ class ContentController extends Controller
 
       if (!empty($validated['quiz_id'])) { $validated['content'] = null; }
       $contents = Content::create($validated);
+      app(\App\Services\Quiz\AttemptHistory::class)->content($contents);
 
       return response()->json([
         'message' => 'Content created successfully',
@@ -107,7 +114,9 @@ class ContentController extends Controller
         }
 
         if (!empty($validated['quiz_id'])) { $validated['content'] = null; }
+        app(\App\Services\Quiz\AttemptHistory::class)->content($content);
         $content->update($validated);
+        app(\App\Services\Quiz\AttemptHistory::class)->content($content);
 
         return response()->json([
             'message' => 'Content updated successfully',
@@ -127,6 +136,7 @@ class ContentController extends Controller
             $service->manage($service->identity(request()), $service->quiz($content->quiz_id));
         }
         app(\App\Services\CourseService::class)->assertAccessible((int) $content->course_id, request());
+        app(\App\Services\Quiz\AttemptHistory::class)->content($content);
         $content->delete();
         
         return response()->json([

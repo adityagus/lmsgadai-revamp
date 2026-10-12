@@ -39,6 +39,10 @@ class CourseService
         $query = Course::with('category:id,name')->orderByDesc('id');
         if ($request && Schema::hasTable('course_access_rules') && $request->session()->get('auth.status') === 'login' && !in_array(app(LmsAccess::class)->role($request), ['admin', 'trainer', 'teacher'], true)) {
             $allowed = DB::table('course_access_rules')->where('position_code', $request->session()->get('auth.idgrup'))->pluck('course_id');
+            $allowed = $allowed->merge(app(TrainingBatchAccess::class)->courseIds((string) $request->session()->get('auth.user')));
+            if (Schema::hasTable('course_participants')) {
+                $allowed = $allowed->merge(DB::table('course_participants')->where('username', $request->session()->get('auth.user'))->pluck('course_id'));
+            }
             $query->where(function ($q) use ($allowed) {
                 $q->whereNotIn('id', DB::table('course_access_rules')->select('course_id')->distinct())
                     ->orWhereIn('id', $allowed);

@@ -34,7 +34,10 @@
                 <nav
                     class="flex flex-col w-full h-fit px-[30px] pt-4 pb-[30px] gap-10 z-10"
                 >
-                    <ul class="flex flex-col gap-1">
+                    <ul
+                        v-if="auth?.role !== 'audit'"
+                        class="flex flex-col gap-1"
+                    >
                         <p
                             class="font-semibold text-xs leading-[18px] text-white"
                         >
@@ -69,7 +72,13 @@
                             class="transition-all duration-200"
                         >
                             <div
-                                @click="handleMainMenuClick(quizManager ? '/kelas' : '/student/kelas')"
+                                @click="
+                                    handleMainMenuClick(
+                                        quizManager
+                                            ? '/kelas'
+                                            : '/student/kelas',
+                                    )
+                                "
                                 class="flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group"
                             >
                                 <img
@@ -83,7 +92,7 @@
                                 >
                             </div>
                         </li>
-                        <li v-if="auth && auth.role !== 'trainer'" class="transition-all duration-200">
+                        <li v-if="auth" class="transition-all duration-200">
                             <div
                                 @click="handleParentClick('info')"
                                 :class="[
@@ -176,9 +185,7 @@
                     <!-- IT SPV,  -->
                     <ul
                         class="flex flex-col gap-4"
-                        v-if="
-                            (auth.role == 'admin' || auth.role == 'trainer')
-                        "
+                        v-if="auth.role == 'admin' || auth.role == 'trainer'"
                     >
                         <p
                             class="font-semibold text-xs leading-[18px] text-white"
@@ -186,7 +193,13 @@
                             Master
                         </p>
                         <li
-                            v-if="auth && (auth.role === 'trainer' || ['JBT-032', 'JBT-038'].includes(auth.idgrup))"
+                            v-if="
+                                auth &&
+                                (auth.role === 'trainer' ||
+                                    ['JBT-032', 'JBT-038'].includes(
+                                        auth.idgrup,
+                                    ))
+                            "
                             :class="{
                                 active: $route.path === '/master/categories',
                             }"
@@ -213,6 +226,17 @@
                         <li v-if="quizManager">
                             <router-link
                                 to="/quiz/manage"
+                                :class="{
+                                    active:
+                                        $route.path === '/quiz/manage' ||
+                                        $route.path.startsWith('/quiz/manage/'),
+                                }"
+                                :aria-current="
+                                    $route.path === '/quiz/manage' ||
+                                    $route.path.startsWith('/quiz/manage/')
+                                        ? 'page'
+                                        : undefined
+                                "
                                 class="flex items-center gap-3 py-3 px-5 rounded-lg text-white font-semibold hover:bg-[#7F33FF33]"
                                 @click="$emit('closeSidebar')"
                                 ><img
@@ -222,12 +246,59 @@
                                 />Bank Soal & Peserta</router-link
                             >
                         </li>
+                        <li>
+                            <router-link
+                                to="/riwayat-belajar"
+                                :class="{
+                                    active: $route.path === '/riwayat-belajar',
+                                }"
+                                :aria-current="
+                                    $route.path === '/riwayat-belajar'
+                                        ? 'page'
+                                        : undefined
+                                "
+                                class="flex items-center gap-3 py-3 px-5 rounded-lg text-white font-semibold hover:bg-[#7F33FF33]"
+                                @click="$emit('closeSidebar')"
+                                >
+                                <img
+                                    src="/assets/images/icons/quiz-history.svg"
+                                    class="w-6 h-6"
+                                    alt=""
+                                />
+                                Riwayat Kuis</router-link
+                            >
+                        </li>
+                        <li>
+                            <router-link
+                                to="/batch-pelatihan"
+                                :class="{
+                                    active: $route.path === '/batch-pelatihan',
+                                }"
+                                :aria-current="
+                                    $route.path === '/batch-pelatihan'
+                                        ? 'page'
+                                        : undefined
+                                "
+                                class="flex items-center gap-3 py-3 px-5 rounded-lg text-white font-semibold hover:bg-[#7F33FF33]"
+                                @click="$emit('closeSidebar')"
+                            >
+                                <img
+                                    src="/assets/images/icons/batch.svg"
+                                    class="w-6 h-6"
+                                    alt=""
+                                />Batch Pelatihan
+                            </router-link>
+                        </li>
                     </ul>
                     <ul
                         class="flex flex-col gap-4"
                         v-if="
                             auth &&
-                            (auth.role === 'admin' || auth.role === 'sop' || auth.role === 'trainer' || auth.idgrup === 'JBT-032' ||
+                            (auth.role === 'admin' ||
+                                auth.role === 'sop' ||
+                                auth.role === 'audit' ||
+                                auth.role === 'trainer' ||
+                                auth.idgrup === 'JBT-032' ||
                                 auth.idgrup === 'JBT-037' ||
                                 auth.idgrup === 'JBT-019' ||
                                 auth.idgrup === 'JBT-020' ||
@@ -276,7 +347,7 @@
                                 class="flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group"
                             >
                                 <img
-                                src="/assets/images/icons/activity-log.svg"
+                                    src="/assets/images/icons/activity-log.svg"
                                     class="w-6 h-6"
                                     alt="icon"
                                 />
@@ -315,9 +386,10 @@ const openMenu = ref("");
 const activeSub = ref(route.path);
 const page = usePage();
 const auth = ref(page.props.auth || null);
-const quizManager = computed(() =>
-    ["admin", "trainer", "teacher"].includes(auth.value?.role) ||
-    ["JBT-032", "JBT-038", "JBT-019", "JBT-020", "042"].includes(auth.value?.idgrup)
+const quizManager = computed(
+    () =>
+        ["admin", "trainer", "teacher"].includes(auth.value?.role) ||
+        ["JBT-032", "JBT-038", "JBT-019", "042"].includes(auth.value?.idgrup),
 );
 const isMobile = ref(window.innerWidth < 768);
 
@@ -361,7 +433,9 @@ onMounted(async () => {
     window.addEventListener("resize", handleResize);
     if (!auth.value) {
         try {
-            const response = await fetch('/session', { headers: { Accept: 'application/json' } });
+            const response = await fetch("/session", {
+                headers: { Accept: "application/json" },
+            });
             const payload = await response.json();
             auth.value = payload.auth || null;
         } catch (_) {
@@ -379,11 +453,15 @@ onMounted(async () => {
     }
 });
 
-watch(() => route.path, path => {
-    activeSub.value = path;
-    if (['/pengumuman', '/formulir'].includes(path)) openMenu.value = 'info';
-});
-onUnmounted(() => window.removeEventListener('resize', handleResize));
+watch(
+    () => route.path,
+    (path) => {
+        activeSub.value = path;
+        if (["/pengumuman", "/formulir"].includes(path))
+            openMenu.value = "info";
+    },
+);
+onUnmounted(() => window.removeEventListener("resize", handleResize));
 </script>
 
 <style>

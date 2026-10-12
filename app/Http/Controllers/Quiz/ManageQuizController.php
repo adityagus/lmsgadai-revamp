@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Quiz;
 
 use App\Http\Controllers\Controller;
 use App\Services\Quiz\QuizService;
+use App\Services\Quiz\EmployeeParticipants;
 use App\Services\Quiz\QuizAudience;
 use App\Services\Quiz\AudienceDirectory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
@@ -50,12 +52,15 @@ class ManageQuizController extends Controller
     public function metadata(Request $r)
     {
         $u = $this->user($r);
+        $classes = DB::table('classes')->when($u->role !== 'admin', function ($q) use ($u) {
+            $q->where('created_by', $u->id);
+        })->get();
+        $members = DB::table('class_students')->whereIn('class_id', $classes->pluck('id'))->get()->groupBy('class_id');
         return [
             'user' => $u,
-            'students' => DB::table('lms_users')->orderBy('name')->get(['id', 'name', 'username', 'role']),
-            'classes' => DB::table('classes')->when($u->role !== 'admin', function ($q) use ($u) {
-                $q->where('created_by', $u->id); })->get()->map(function ($c) {
-                    $c->student_ids = DB::table('class_students')->where('class_id', $c->id)->pluck('student_id');
+            'students' => app(EmployeeParticipants::class)->all(),
+            'classes' => $classes->map(function ($c) use ($members) {
+                    $c->student_ids = $members->get($c->id, collect())->pluck('student_id');
                     return $c; }),
             'courses' => DB::table('courses')->get(['id', 'name']),
             'banks' => DB::table('question_banks')->when($u->role !== 'admin', function ($q) use ($u) {
@@ -74,15 +79,13 @@ class ManageQuizController extends Controller
     {
         $u = $this->user($r);
         abort_unless($u->role === 'admin', 403);
-        $data = $r->validate(['username' => 'required|string|max:150', 'name' => 'required|string|max:255', 'role' => 'required|in:admin,trainer,teacher,student']);
-        DB::table('lms_users')->updateOrInsert(['username' => $data['username']], $data + ['updated_at' => now()]);
-        return ['message' => 'Pengguna LMS disimpan.'];
+        abort(405, 'Data pengguna dikelola melalui sistem karyawan.');
     }
 
     public function saveClass(Request $r)
     {
         $u = $this->user($r);
-        $data = $r->validate(['id' => 'nullable|integer', 'name' => 'required|string|max:255', 'student_ids' => 'present|array', 'student_ids.*' => 'integer|distinct|exists:lms_users,id']);
+        $data = $r->validate(['id' => 'nullable|integer', 'name' => 'required|string|max:255', 'student_ids' => 'present|array', 'student_ids.*' => ['bail', 'integer', 'distinct', app(EmployeeParticipants::class)->validationRule()]]);
         return DB::transaction(function () use ($u, $data) {
             if (!empty($data['id'])) {
                 $this->owned('classes', $data['id'], $u);
@@ -109,13 +112,40 @@ class ManageQuizController extends Controller
     public function questions(Request $r)
     {
         $u = $this->user($r);
-        return DB::table('questions')->when($u->role !== 'admin', function ($q) use ($u) {
+        $questions = DB::table('questions')->select('questions.*')
+            ->selectRaw('(EXISTS (SELECT 1 FROM quiz_questions WHERE question_id = questions.id) OR EXISTS (SELECT 1 FROM quiz_attempt_questions WHERE question_id = questions.id)) AS is_used')
+            ->when($u->role !== 'admin', function ($q) use ($u) {
             $q->where('created_by', $u->id); })
             ->when($r->bank_id, function ($q) use ($r) {
-                $q->where('bank_id', $r->bank_id); })->orderByDesc('id')->get()->map(function ($q) {
-                    $q->options = DB::table('question_options')->where('question_id', $q->id)->get();
+                $q->where('bank_id', $r->bank_id); })->orderByDesc('id')->get();
+        $options = DB::table('question_options')->whereIn('question_id', $questions->pluck('id'))->orderBy('id')->get()->groupBy('question_id');
+        return $questions->map(function ($q) use ($options) {
+                    $q->is_used = (bool) $q->is_used;
+                    $q->options = $options->get($q->id, collect())->values();
+                    $q->image_url = \App\Services\Quiz\QuestionImage::url($q->image_path);
                     return $q;
                 });
+    }
+
+    public function uploadQuestionImage(Request $r)
+    {
+        $user = $this->user($r);
+        $r->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120|dimensions:max_width=8000,max_height=8000']);
+        $path = $r->file('image')->store('quiz-questions/'.$user->id, 'public');
+        abort_unless($path, 500, 'Gambar gagal disimpan. Silakan coba lagi.');
+        return ['image_path' => $path, 'image_url' => \App\Services\Quiz\QuestionImage::url($path)];
+    }
+
+    public function showQuestionImage(string $path)
+    {
+        $disk = Storage::disk('public');
+        $file = 'quiz-questions/'.$path;
+        abort_unless($disk->exists($file), 404, 'Gambar soal tidak ditemukan.');
+
+        return $disk->response($file, null, [
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ], 'inline');
     }
 
     public function saveQuestion(Request $r, $id = null)
@@ -123,8 +153,10 @@ class ManageQuizController extends Controller
         $u = $this->user($r);
         $data = $r->validate([
             'bank_id' => 'nullable|integer|exists:question_banks,id',
+            'version_if_used' => 'sometimes|boolean',
             'course_id' => 'nullable|integer|exists:courses,id',
             'question' => 'required|string|max:20000',
+            'image_path' => ['nullable', 'string', 'max:255', 'regex:~^quiz-questions/[0-9]+/[A-Za-z0-9]+\.(jpg|jpeg|png|webp)$~'],
             'type' => 'required|in:multiple_choice,multiple_answer,true_false,essay',
             'weight' => 'required|numeric|min:0.01|max:10000',
             'category' => 'nullable|string|max:255',
@@ -135,6 +167,10 @@ class ManageQuizController extends Controller
             'options.*.text' => 'required|string|max:5000',
             'options.*.is_correct' => 'required|boolean',
         ]);
+        if (!empty($data['image_path'])) {
+            abort_unless($u->role === 'admin' || str_starts_with($data['image_path'], 'quiz-questions/'.$u->id.'/'), 403);
+            abort_unless(Storage::disk('public')->exists($data['image_path']), 422, 'Gambar tidak ditemukan. Unggah kembali gambar soal.');
+        }
         if (empty($data['bank_id'])) {
             $bank = DB::table('question_banks')->where('created_by', $u->id)->first();
             if (!$bank) {
@@ -151,10 +187,18 @@ class ManageQuizController extends Controller
         }
         $this->owned('question_banks', $data['bank_id'], $u);
         return DB::transaction(function () use ($data, $u, $id) {
+            $versionIfUsed = $data['version_if_used'] ?? false;
+            unset($data['version_if_used']);
+            $createdVersion = false;
             if ($id) {
                 $this->owned('questions', $id, $u);
                 DB::table('questions')->where('id', $id)->lockForUpdate()->first();
-                abort_if(DB::table('quiz_questions')->where('question_id', $id)->exists() || DB::table('quiz_attempt_questions')->where('question_id', $id)->exists(), 422, 'Soal sudah digunakan. Buat soal baru untuk menjaga riwayat ujian.');
+                $used = DB::table('quiz_questions')->where('question_id', $id)->exists() || DB::table('quiz_attempt_questions')->where('question_id', $id)->exists();
+                abort_if($used && !$versionIfUsed, 422, 'Soal sudah digunakan. Buat soal baru untuk menjaga riwayat ujian.');
+                if ($used) {
+                    $id = null;
+                    $createdVersion = true;
+                }
             }
             $options = $data['options'];
             unset($data['options']);
@@ -177,7 +221,7 @@ class ManageQuizController extends Controller
             foreach ($options as $o) {
                 DB::table('question_options')->insert(['question_id' => $id, 'text' => $o['text'], 'is_correct' => $o['is_correct']]);
             }
-            return ['id' => $id];
+            return ['id' => $id, 'created_version' => $createdVersion];
         });
     }
 
@@ -235,7 +279,7 @@ class ManageQuizController extends Controller
             'question_ids' => 'present|array|max:1000',
             'question_ids.*' => 'integer|distinct|exists:questions,id',
             'overrides' => 'present|array',
-            'overrides.*.student_id' => 'required|integer|distinct|exists:lms_users,id',
+            'overrides.*.student_id' => ['bail', 'required', 'integer', 'distinct', app(EmployeeParticipants::class)->validationRule()],
             'overrides.*.additional_minutes' => 'required|integer|min:0|max:1440',
             'overrides.*.maximum_attempt' => 'nullable|integer|min:0|max:100',
             'overrides.*.available_from' => 'nullable|date',
@@ -273,7 +317,7 @@ class ManageQuizController extends Controller
                 $this->owned('questions', $id, $u);
                 DB::table('questions')->where('id', $id)->lockForUpdate()->first();
             }
-            $this->service->validatePassingGrade($data['passing_grade'], $questions);
+            $this->service->validatePassingGrade($data['passing_grade']);
             if ($data['status'] === 'PUBLISHED') {
                 $issues = [];
                 if (count($questions) < $data['question_count']) {
@@ -327,7 +371,7 @@ class ManageQuizController extends Controller
     {
         $u = $this->user($r);
         $this->service->manage($u, $this->service->quiz($quiz));
-        $o = $r->validate(['student_id' => 'required|integer|exists:lms_users,id', 'additional_minutes' => 'required|integer|min:0|max:1440', 'maximum_attempt' => 'nullable|integer|min:0|max:100', 'available_from' => 'nullable|date', 'available_until' => 'nullable|date']);
+        $o = $r->validate(['student_id' => ['bail', 'required', 'integer', app(EmployeeParticipants::class)->validationRule()], 'additional_minutes' => 'required|integer|min:0|max:1440', 'maximum_attempt' => 'nullable|integer|min:0|max:100', 'available_from' => 'nullable|date', 'available_until' => 'nullable|date']);
         $this->storeOverride($quiz, $o);
         return ['message' => 'Override berlaku untuk attempt berikutnya.'];
     }
@@ -340,7 +384,7 @@ class ManageQuizController extends Controller
             'status' => 'sometimes|in:PUBLISHED,CLOSED',
             'maximum_attempt' => 'sometimes|required|integer|min:0|max:100',
             'overrides' => 'sometimes|array',
-            'overrides.*.student_id' => 'required|integer|distinct|exists:lms_users,id',
+            'overrides.*.student_id' => ['bail', 'required', 'integer', 'distinct', app(EmployeeParticipants::class)->validationRule()],
             'overrides.*.additional_minutes' => 'required|integer|min:0|max:1440',
             'overrides.*.maximum_attempt' => 'nullable|integer|min:0|max:100',
             'overrides.*.available_from' => 'nullable|date',
@@ -355,7 +399,7 @@ class ManageQuizController extends Controller
             $existing = DB::table('quizzes')->where('id', $quiz)->lockForUpdate()->first();
             abort_if($existing->status === 'DRAFT', 422, 'Terbitkan quiz melalui editor.');
             if (($data['status'] ?? $existing->status) === 'PUBLISHED') {
-                $this->service->validatePassingGrade($existing->passing_grade, DB::table('quiz_questions')->where('quiz_id', $quiz)->pluck('question_id'));
+                $this->service->validatePassingGrade($existing->passing_grade);
             }
             if (!empty($existing->no_schedule)) { $data['release_after_close'] = false; }
             $overrides = $data['overrides'] ?? [];
@@ -442,8 +486,9 @@ class ManageQuizController extends Controller
             'duration_minutes' => $q->duration_minutes,
             'questions' => $ids->take($q->question_count)->values()->map(function ($id, $i) use ($q) {
                 $question = DB::table('questions')->find($id);
+                $imageUrl = \App\Services\Quiz\QuestionImage::url($question->image_path);
                 $options = DB::table('question_options')->where('question_id', $id)->get(['id', 'text']);
-                return ['id' => $id, 'position' => $i + 1, 'question' => $question->question, 'type' => $question->type, 'options' => $q->randomize_answer ? $options->shuffle()->values() : $options, 'selected_options' => [], 'essay' => '', 'flagged' => false, 'visited' => false];
+                return ['id' => $id, 'position' => $i + 1, 'question' => $question->question, 'image_url' => $imageUrl, 'type' => $question->type, 'options' => $q->randomize_answer ? $options->shuffle()->values() : $options, 'selected_options' => [], 'essay' => '', 'flagged' => false, 'visited' => false];
             })
         ];
     }
@@ -468,6 +513,7 @@ class ManageQuizController extends Controller
         abort_if(!$chosen, 422, 'Belum ada soal lain dengan bank, kategori, dan tingkat kesulitan yang sama. Gunakan Pilih dari Bank Soal untuk memilih sendiri.');
 
         $chosen->options = DB::table('question_options')->where('question_id', $chosen->id)->get();
+        $chosen->image_url = \App\Services\Quiz\QuestionImage::url($chosen->image_path);
         return ['question' => $chosen];
     }
 

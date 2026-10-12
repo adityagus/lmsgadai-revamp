@@ -10,7 +10,7 @@
             karyawan.</p>
         </div>
         <div class="flex items-center gap-3">
-          <button @click="exportToExcel" :disabled="exporting"
+          <button v-if="!isAudit" @click="exportToExcel" :disabled="exporting"
             class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-xl shadow transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0">
             <svg v-if="!exporting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -402,6 +402,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+const page = usePage();
+const isAudit = computed(() => page.props.auth?.role === 'audit');
 import { exportActivityLogs } from '@/services/mutations/reportMutation.ts';
 import { getDocumentViewStats, getUnviewedUsers, getViewedUsers } from '@/services/queries/documentViewQuery.ts';
 
@@ -609,7 +612,7 @@ const formatDetailDate = (dateStr) => {
 };
 
 const exportToExcel = async () => {
-  if (exporting.value) return;
+  if (isAudit.value || exporting.value) return;
   try {
     exporting.value = true;
     const response = await exportActivityLogs();

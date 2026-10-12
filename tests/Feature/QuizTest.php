@@ -11,6 +11,7 @@ use App\Services\Quiz\QuizService;
 
 class QuizTest extends TestCase
 {
+    use \Tests\EmployeeDatabase;
     private $teacher;
     private $student;
     private $other;
@@ -23,11 +24,13 @@ class QuizTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->createEmployeeDatabase();
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:', 'database.connections.sqlite.url' => null]);
         DB::purge('sqlite');
         Schema::create('courses', function (Blueprint $t) { $t->id(); $t->string('name'); });
         require_once database_path('migrations/2026_09_23_000001_create_quiz_module.php');
         (new \CreateQuizModule)->up();
+        (require database_path('migrations/2026_10_07_000001_add_image_path_to_questions.php'))->up();
         require_once database_path('migrations/2026_09_24_000001_add_quiz_no_schedule.php');
         (new \AddQuizNoSchedule)->up();
         require_once database_path('migrations/2026_09_23_000003_add_quiz_question_explanation.php');
@@ -50,8 +53,138 @@ class QuizTest extends TestCase
     }
 
     protected function tearDown(): void { Carbon::setTestNow(); parent::tearDown(); }
-    private function loginAs($name, $position = null) { $this->withSession(['auth' => ['user' => $name, 'nama' => $name, 'status' => 'login', 'idgrup' => $position]]); }
+    private function loginAs($name, $position = null) { $position ??= str_contains($name, 'trainer') ? 'JBT-TRAINER' : null; $this->withSession(['auth' => ['user' => $name, 'nama' => $name, 'status' => 'login', 'idgrup' => $position]]); }
     private function start() { return $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertOk()->json(); }
+
+    public function test_employee_directory_is_authoritative_without_replacing_historical_ids(): void
+    {
+        DB::table('lms_users')->where('id', $this->student)->update(['name' => 'Outdated Name', 'role' => 'admin']);
+        DB::table('lms_users')->insert(['username' => 'local-only', 'name' => 'Local Only', 'role' => 'admin']);
+        $this->loginAs('trainer');
+        $response = $this->getJson('/api/quiz/metadata')->assertOk();
+        $students = collect($response->json('students'))->keyBy('username');
+        $this->assertSame($this->student, $students['budi']['id']);
+        $this->assertSame('Budi Karyawan', $students['budi']['name']);
+        $this->assertSame('student', $students['budi']['role']);
+        $this->assertTrue($students->has('new-employee'));
+        $this->assertFalse($students->has('local-only'));
+        $this->assertFalse($students->has('inactive'));
+        $this->assertStringNotContainsString('never-expose', $response->getContent());
+        $this->postJson('/api/quiz/classes', ['name' => 'Karyawan Baru', 'student_ids' => [$students['new-employee']['id']]])->assertOk();
+        DB::connection('db2')->table('auth.users')->where('username', 'new-employee')->update(['is_active' => false]);
+        $this->postJson('/api/quiz/classes', ['name' => 'Nonaktif', 'student_ids' => [$students['new-employee']['id']]])->assertUnprocessable();
+        $localId = DB::table('lms_users')->where('username', 'local-only')->value('id');
+        $this->postJson('/api/quiz/classes', ['name' => 'Lokal', 'student_ids' => [$localId]])->assertUnprocessable();
+        $this->loginAs('local-only', 'JBT-032');
+        $this->getJson('/api/quiz/metadata')->assertForbidden();
+    }
+
+    public function test_question_list_batches_options_without_mixing_questions(): void
+    {
+        $second = (array) DB::table('questions')->find($this->question);
+        unset($second['id']);
+        $second['question'] = 'Soal kedua';
+        $id = DB::table('questions')->insertGetId($second);
+        DB::table('question_options')->insert(['question_id' => $id, 'text' => 'Opsi kedua', 'is_correct' => true]);
+        $this->loginAs('trainer');
+        DB::enableQueryLog();
+        $response = $this->getJson('/api/quiz/questions')->assertOk()->assertJsonCount(2);
+        $optionQueries = collect(DB::getQueryLog())->filter(fn ($q) => str_contains($q['query'], 'from "question_options"'));
+        DB::disableQueryLog();
+        $this->assertCount(1, $optionQueries);
+        $response->assertJsonPath('0.id', $id)->assertJsonCount(1, '0.options')->assertJsonPath('0.options.0.text', 'Opsi kedua')
+            ->assertJsonPath('1.id', $this->question)->assertJsonCount(2, '1.options');
+    }
+
+    public function test_quiz_history_reads_current_employee_name_even_after_deactivation(): void
+    {
+        $attempt = $this->start();
+        $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertOk();
+        DB::connection('db2')->table('auth.users')->where('username', 'budi')->update(['full_name' => 'Nama Karyawan Terbaru', 'is_active' => false]);
+        $this->getJson('/api/quiz/student')->assertForbidden();
+        $this->loginAs('trainer');
+        $this->getJson('/api/quiz/manage/'.$this->quiz.'/results')->assertOk()
+            ->assertJsonPath('attempts.0.student_id', $this->student)
+            ->assertJsonPath('attempts.0.name', 'Nama Karyawan Terbaru');
+        $this->getJson('/api/quiz/results/'.$attempt['id'])->assertOk()
+            ->assertJsonPath('student', 'Nama Karyawan Terbaru');
+    }
+
+    public function test_used_question_edits_create_a_version_without_changing_history(): void
+    {
+        $attempt = $this->start();
+        $this->answer($attempt, [$this->correct])->assertOk();
+        $original = (array) DB::table('questions')->find($this->question);
+        $options = DB::table('question_options')->where('question_id', $this->question)->get()->toArray();
+        $this->loginAs('trainer', 'JBT-032');
+        $this->getJson('/api/quiz/questions')->assertOk()->assertJsonPath('0.is_used', true);
+        $payload = ['bank_id' => 1, 'question' => 'Pertanyaan revisi', 'type' => 'true_false', 'weight' => 3, 'difficulty' => 'medium', 'options' => [
+            ['text' => 'Ya', 'is_correct' => false], ['text' => 'Tidak', 'is_correct' => true],
+        ], 'version_if_used' => true];
+        $id = $this->putJson('/api/quiz/questions/'.$this->question, $payload)
+            ->assertOk()->assertJsonPath('created_version', true)->json('id');
+        $this->assertNotEquals($this->question, $id);
+        $this->assertSame($original, (array) DB::table('questions')->find($this->question));
+        $this->assertEquals($options, DB::table('question_options')->where('question_id', $this->question)->get()->toArray());
+        $this->assertDatabaseHas('quiz_questions', ['quiz_id' => $this->quiz, 'question_id' => $this->question]);
+        $this->assertDatabaseHas('questions', ['id' => $id, 'question' => 'Pertanyaan revisi', 'created_by' => $this->teacher]);
+        $this->getJson('/api/quiz/questions')->assertOk()->assertJsonPath('0.is_used', false);
+        $this->putJson('/api/quiz/questions/'.$id, [...$payload, 'question' => 'Revisi kedua'])
+            ->assertOk()->assertJsonPath('id', (string) $id)->assertJsonPath('created_version', false);
+        $this->assertDatabaseHas('questions', ['id' => $id, 'question' => 'Revisi kedua']);
+        $this->loginAs('budi');
+        $this->getJson('/api/quiz/attempts/'.$attempt['id'])->assertOk()
+            ->assertJsonPath('questions.0.selected_options', [$this->correct]);
+        $this->putJson('/api/quiz/questions/'.$this->question, $payload)->assertForbidden();
+        $this->loginAs('other', 'JBT-TRAINER');
+        $this->putJson('/api/quiz/questions/'.$this->question, [...$payload, 'bank_id' => null])->assertForbidden();
+        // Historical usage alone still requires a new version after unlinking a quiz.
+        DB::table('quiz_questions')->where('question_id', $this->question)->delete();
+        $this->loginAs('trainer', 'JBT-032');
+        $this->putJson('/api/quiz/questions/'.$this->question, $payload)
+            ->assertOk()->assertJsonPath('created_version', true);
+        $this->assertSame($original, (array) DB::table('questions')->find($this->question));
+    }
+
+    public function test_question_image_upload_validation_and_attempt_display(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=');
+        $file = fn () => \Illuminate\Http\UploadedFile::fake()->createWithContent('question.png', $png);
+        $this->post('/api/quiz/question-images', ['image' => $file()], ['Accept' => 'application/json'])->assertForbidden();
+        $this->loginAs('trainer', 'JBT-032');
+        $uploaded = $this->post('/api/quiz/question-images', ['image' => $file()], ['Accept' => 'application/json'])->assertOk()->json();
+        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($uploaded['image_path']);
+        $this->assertStringStartsWith('/api/quiz/question-images/', $uploaded['image_url']);
+        foreach (['local', 's3'] as $driver) {
+            config(['filesystems.lms_storage_driver' => $driver]);
+            $this->get($uploaded['image_url'])->assertOk()->assertStreamedContent($png)
+                ->assertHeader('Content-Type', 'image/png')->assertHeader('X-Content-Type-Options', 'nosniff');
+        }
+        $this->withSession(['auth' => []])->getJson($uploaded['image_url'])->assertUnauthorized();
+        $this->loginAs('budi');
+        $this->get($uploaded['image_url'])->assertOk()->assertStreamedContent($png);
+        $this->get('/api/quiz/question-images/1/missing.png')->assertNotFound();
+        $this->loginAs('trainer', 'JBT-032');
+        $this->post('/api/quiz/question-images', ['image' => \Illuminate\Http\UploadedFile::fake()->create('not-image.pdf', 10)], ['Accept' => 'application/json'])->assertUnprocessable();
+        $payload = ['question' => 'Lihat gambar berikut', 'type' => 'essay', 'weight' => 2.5, 'difficulty' => 'easy', 'options' => [], 'image_path' => $uploaded['image_path']];
+        $id = $this->postJson('/api/quiz/questions', $payload)->assertOk()->json('id');
+        $this->assertDatabaseHas('questions', ['id' => $id, 'image_path' => $uploaded['image_path']]);
+        $this->getJson('/api/quiz/questions')->assertOk()->assertJsonFragment(['image_url' => $uploaded['image_url']]);
+        $this->postJson('/api/quiz/questions', [...$payload, 'image_path' => '../private.png'])->assertUnprocessable();
+        $this->putJson('/api/quiz/questions/'.$id, [...$payload, 'image_path' => null])->assertOk();
+        $this->assertDatabaseHas('questions', ['id' => $id, 'image_path' => null]);
+        $this->putJson('/api/quiz/questions/'.$id, $payload)->assertOk();
+        DB::table('quiz_questions')->where('quiz_id', $this->quiz)->update(['question_id' => $id]);
+        $this->getJson('/api/quiz/manage/'.$this->quiz.'/preview')->assertOk()->assertJsonPath('questions.0.image_url', $uploaded['image_url']);
+        $this->loginAs('budi');
+        $attempt = $this->start();
+        $this->assertSame($uploaded['image_url'], $attempt['questions'][0]['image_url']);
+        $this->assertArrayNotHasKey('is_correct', $attempt['questions'][0]);
+        $this->loginAs('trainer', 'JBT-032');
+        $this->putJson('/api/quiz/questions/'.$id, [...$payload, 'image_path' => null])->assertUnprocessable();
+        $this->getJson('/api/quiz/results/'.$attempt['id'])->assertOk()->assertJsonPath('questions.0.image_url', $uploaded['image_url']);
+    }
     private function answer($a, $options, $revision = 0) { return $this->putJson('/api/quiz/attempts/'.$a['id'].'/answers/'.$a['questions'][0]['id'], ['selected_options' => $options, 'essay' => '', 'flagged' => true, 'visited' => true, 'revision' => $revision, 'student_id' => $this->other, 'score' => 100]); }
 
     public function test_course_sequence_requires_prior_lesson_then_quiz_submission_before_next_lesson()
@@ -184,7 +317,7 @@ class QuizTest extends TestCase
     public function test_trainer_role_is_separate_and_cannot_manage_other_owners_or_roles()
     {
         $this->loginAs('administrator', 'JBT-032');
-        $this->postJson('/api/quiz/users', ['username' => 'trainer', 'name' => 'Trainer', 'role' => 'trainer'])->assertOk();
+        $this->postJson('/api/quiz/users', ['username' => 'trainer', 'name' => 'Trainer', 'role' => 'trainer'])->assertStatus(405);
         $this->loginAs('trainer');
         $this->getJson('/api/quiz/metadata')->assertOk()->assertJsonPath('user.role', 'trainer');
         $this->getJson('/api/quiz/manage/'.$this->quiz)->assertOk();
@@ -510,18 +643,25 @@ class QuizTest extends TestCase
         $this->getJson('/api/quiz/student')->assertOk()->assertJsonPath('quizzes.0.course_id', $course);
         $this->postJson('/api/quiz/'.$this->quiz.'/start')->assertOk()->assertJsonPath('status', 'IN_PROGRESS');
         $this->loginAs('trainer');
-        $this->getJson('/api/quiz/manage/'.$this->quiz.'/results')->assertOk()->assertJsonPath('classes.0.name', 'Produk Gadai')->assertJsonPath('statistics.participants', 3);
+        $this->getJson('/api/quiz/manage/'.$this->quiz.'/results')->assertOk()->assertJsonPath('classes.0.name', 'Produk Gadai')->assertJsonPath('statistics.participants', 7);
     }
 
-    public function test_passing_grade_cannot_exceed_total_question_weight()
+    public function test_passing_grade_uses_normalized_scale_independently_of_question_weight()
     {
-        $this->loginAs('trainer');
+        $this->loginAs('trainer', 'JBT-TRAINER');
         $form = $this->getJson('/api/quiz/manage/'.$this->quiz)->assertOk()->json();
         $form['course_id'] = DB::table('courses')->insertGetId(['name' => 'Bobot']);
         $form['class_ids'] = [];
+        foreach (['randomize_question', 'randomize_answer', 'show_score', 'show_correct_answer', 'show_wrong_answer', 'show_explanation', 'show_total_correct', 'show_passing_status', 'release_after_close', 'no_schedule'] as $key) {
+            if (isset($form[$key])) $form[$key] = (bool) $form[$key];
+        }
+        DB::table('questions')->where('id', $this->question)->update(['weight' => 100]);
+        $form['passing_grade'] = 70;
+        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
+        $this->assertDatabaseHas('quizzes', ['id' => $this->quiz, 'passing_grade' => 70]);
         DB::table('questions')->where('id', $this->question)->update(['weight' => 75]);
         $form['passing_grade'] = 75.01;
-        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422)->assertJsonValidationErrors('passing_grade');
+        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
         $form['passing_grade'] = 74;
         $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
         $form['passing_grade'] = 75;
@@ -532,7 +672,42 @@ class QuizTest extends TestCase
         $this->putJson('/api/quiz/questions/'.$this->question, $question)->assertStatus(422);
         $this->assertEquals(75, DB::table('questions')->where('id', $this->question)->value('weight'));
         DB::table('questions')->where('id', $this->question)->update(['weight' => 101]);
-        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422)->assertJsonValidationErrors('passing_grade');
+        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
+        DB::table('questions')->where('id', $this->question)->update(['weight' => 1]);
+        $form['passing_grade'] = 80;
+        $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertOk();
+        foreach ([-0.01, 100.01] as $invalidGrade) {
+            $form['passing_grade'] = $invalidGrade;
+            $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422)->assertJsonValidationErrors('passing_grade');
+        }
+    }
+
+    public function test_five_question_score_uses_relative_weights_and_normalized_passing_grade()
+    {
+        foreach ([[1, 1, 1, 1, 1], [20, 20, 20, 20, 20], [40, 20, 20, 10, 10], [400, 200, 200, 100, 100]] as $weights) {
+            DB::table('quiz_questions')->where('quiz_id', $this->quiz)->delete();
+            DB::table('quizzes')->where('id', $this->quiz)->update(['question_count' => 5, 'passing_grade' => 80, 'maximum_attempt' => 0, 'show_score' => true, 'show_total_correct' => true, 'show_passing_status' => true]);
+            $answers = [];
+            foreach ($weights as $index => $weight) {
+                $id = DB::table('questions')->insertGetId(['bank_id' => 1, 'question' => 'Soal '.$index, 'type' => 'multiple_choice', 'weight' => $weight, 'difficulty' => 'easy', 'created_by' => $this->teacher]);
+                $correct = DB::table('question_options')->insertGetId(['question_id' => $id, 'text' => 'Benar', 'is_correct' => true]);
+                $wrong = DB::table('question_options')->insertGetId(['question_id' => $id, 'text' => 'Salah', 'is_correct' => false]);
+                DB::table('quiz_questions')->insert(['quiz_id' => $this->quiz, 'question_id' => $id, 'position' => $index]);
+                $answers[$id] = $index === 0 ? $wrong : $correct;
+            }
+            $attempt = $this->start();
+            foreach ($attempt['questions'] as $question) {
+                $questionId = DB::table('quiz_attempt_questions')->where('id', $question['id'])->value('question_id');
+                $this->putJson('/api/quiz/attempts/'.$attempt['id'].'/answers/'.$question['id'], [
+                    'selected_options' => [$answers[$questionId]], 'essay' => '', 'flagged' => false, 'visited' => true, 'revision' => 0,
+                ])->assertOk();
+            }
+            $this->postJson('/api/quiz/attempts/'.$attempt['id'].'/submit')->assertOk();
+            $expected = $weights[0] === $weights[1] ? 80 : 60;
+            $this->getJson('/api/quiz/attempts/'.$attempt['id'])->assertOk()
+                ->assertJsonPath('score', $expected)->assertJsonPath('passed', $expected >= 80)
+                ->assertJsonPath('total_correct', 4)->assertJsonPath('total_wrong', 1);
+        }
     }
 
     public function test_quiz_without_dates_can_be_published_and_started_later_with_a_timer()
@@ -592,7 +767,7 @@ class QuizTest extends TestCase
 
     public function test_authoring_publish_validation_and_immutable_used_questions()
     {
-        $this->loginAs('trainer');
+        $this->loginAs('trainer', 'JBT-TRAINER');
         $q = ['bank_id' => 1, 'question' => 'Emas dapat menjadi jaminan?', 'type' => 'true_false', 'weight' => 1, 'difficulty' => 'medium', 'options' => [['text' => 'Benar', 'is_correct' => true], ['text' => 'Salah', 'is_correct' => false]]];
         $newQuestion = $this->postJson('/api/quiz/questions', $q)->assertOk()->json('id');
         $form = $this->getJson('/api/quiz/manage/'.$this->quiz)->assertOk()->json();
@@ -610,7 +785,7 @@ class QuizTest extends TestCase
         $this->answer($a, [])->assertOk();
         $heartbeat = $this->getJson('/api/quiz/attempts/'.$a['id'].'?heartbeat=1')->assertOk()->assertHeader('Cache-Control', 'max-age=0, no-store, private');
         $this->assertArrayNotHasKey('questions', $heartbeat->json());
-        $this->loginAs('trainer');
+        $this->loginAs('trainer', 'JBT-TRAINER');
         $this->putJson('/api/quiz/manage/'.$this->quiz, $form)->assertStatus(422);
         $this->patchJson('/api/quiz/manage/'.$this->quiz.'/visibility', ['show_score' => true, 'status' => 'CLOSED'])->assertOk();
     }

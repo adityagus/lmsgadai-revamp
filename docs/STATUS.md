@@ -1,5 +1,173 @@
 # Revamp status
 
+Quiz normalized passing grade (2026-10-12):
+- Fixed inconsistent validation that capped passing_grade by total question weight and rejected total weights above 100, while scores already used earned points / total attempt weight * 100. Passing grade is now independently validated on 0–100 in backend/editor; displayed help explains relative weights and the five-equal-question example. Existing scoring formula, saved grades, and historical attempts were not rewritten.
+- Verified 4 backend tests / 89 assertions on SQLite memory: low/high weights accepted with normalized thresholds, out-of-range grades rejected, five equal questions with one wrong score 80, unequal weights with the 40% question wrong score 60, scaled equivalent weights preserve results, and existing submission/aggregation behavior. Nine frontend flow tests, TypeScript, production build, and focused whitespace checks passed (existing chunk warning). No live database changes or browser verification.
+
+Public popular-course landing cards (2026-10-12):
+- Landing now loads all courses where the existing is_popular field is true, including for guests, with no six-card truncation. Added /api/popular-courses exposing only id/name/description/thumbnail URL; protected course APIs remain restricted. Public summary catalog is also readable by audit, without changing audit's protected learning access.
+- Retained existing /detail-course/{id} preview links and their current access rules; added explicit empty/error/retry states and renamed section to Jelajahi kelas populer. No course flags or database content changed.
+- Verified 3 focused tests / 41 assertions on SQLite memory: all nine popular fixture cards, exclusion of false/null flags, minimal public payload, thumbnail fallback, empty catalog, guest/audit protected-API denial, and public landing routing. TypeScript, production build, and focused whitespace checks passed (existing chunk warning). Browser preview not run.
+
+Audit staff and trainer document reading (2026-10-12):
+- Latest user clarification supersedes JBT-020 trainer mapping: JBT-020 is now audit, with report/activity pages and GET data endpoints only. Dedicated report page group, audit-only sidebar, login redirect to /report/documents, and overview redirect added. Audit cannot access learning, document management/archives, document reading, or exports; session/logout remain available. Export buttons hidden for audit. JBT-038 remains trainer.
+- User clarified trainers MAY read document statistic cards, lists, and open documents. Restored Information navigation and read endpoints, regional filters, and view logging. Create/edit forms, create/update/delete/restore endpoints, and archives remain denied. Existing document audience queries unchanged.
+- Verified 6 focused backend tests / 266 assertions on SQLite memory with report/read mocks plus audience regression; includes audit login password rejection/session rotation, audit read-only access, trainer read/view logging on both prefixes, trainer mutation denial, and admin/SOP preservation. TypeScript, production build, and focused whitespace checks passed (existing chunk-size warning). Configuration cache cleared. No live database mutations or authenticated browser verification.
+
+JBT-038 trainer mapping (2026-10-12):
+- User designated JBT-038 as trainer; changed its prior admin mapping. JBT-020 remains trainer as previously confirmed. Cleared configuration cache.
+- Focused tests passed: 3 tests / 141 assertions on SQLite memory, including JBT-038 document creation/archive denial, learning access, JBT-032 admin access, and SOP report access. Focused whitespace check passed.
+
+Trainer document restrictions (2026-10-12):
+- User confirmed JBT-020 is trainer; changed its SOP mapping accordingly. Trainer cannot create/update/delete/restore documents or access archives; verified existing backend guards across legacy and v1 endpoints. Hidden the entire create/archive toolbar for non-document-managers.
+- Added trainer to the instructor page group so learning/quiz management remains accessible; existing SOP membership retained. Fixed the pengum`uman/create page-map typo for authorized document managers. Cleared configuration cache.
+- Focused report/trainer regressions: 2 tests / 116 assertions passed on SQLite memory, including four trainer position codes, learning pages, document restrictions, and admin/SOP create/archive access. Frontend build and focused whitespace checks passed (existing chunk warning). Browser verification not performed.
+
+Document report SOP access (2026-10-12):
+- Fixed LmsAuthorization rejecting SOP users at DocumentReportController and document-view reporting endpoints despite allowing their report/audit pages. Existing manager access retained; student/guest denial retained.
+- Focused regression passed: 1 test / 36 assertions using SQLite memory and mocked report data, covering both document-view prefixes, report/page access, and denied student exports. Read-only live queries succeeded: report 13,524 rows, audit statistics 260 documents. No database writes; no authenticated browser verification.
+- Focused whitespace check passed. Broader PositionAuthorizationTest: 4 passed, 4 failed / 62 assertions; remaining failures concern existing pengum`uman/create component typo and trainer/quiz role expectations outside this change.
+
+Landing learning categories (2026-10-12):
+- Replaced generic categories with Operasional Gadai, Penaksiran Barang, Pelayanan Nasabah, and Keuangan, including matching Indonesian descriptions and installed PrimeIcons.
+- Production build passed (existing chunk-size warning). Browser verification not run for this content change.
+
+Landing testimonial quotation mark (2026-10-12):
+- Replaced pi-block-quote with a decorative opening double quotation mark (&ldquo;) at the user's request; retained purple color and used a bold serif glyph.
+- Production build passed (existing chunk-size warning). No browser verification; focused whitespace check reports pre-existing trailing whitespace in home.vue outside this change.
+
+Landing quote icon and anchor scrolling (2026-10-09):
+- Testimonial decoration now uses PrimeIcons pi-block-quote. Native section links use smooth scrolling only while the landing page is mounted, with existing desktop/mobile header offsets preserved. Reduced-motion preference keeps native instant scrolling. User edits to testimonial content and images retained.
+- Quote-icon and smooth-scroll production builds and focused whitespace checks passed (existing chunk warning); no new browser run for this CSS-only adjustment.
+
+Landing page design and dashboard primary color (2026-10-09):
+- Redesigned the existing public landing page with a team-photo hero, purple/Poppins styling, feature strip, about/vision/mission, categories, course cards, retained testimonials, native FAQ accordions, closing CTA and footer. Added accessible mobile navigation and skip link; removed AOS dependency from this page so content does not wait for animation initialization.
+- Shared primary button styles use dashboard purple #662FFF with #5422DB hover. Sign In preserves processing disable/50% opacity and duplicate-submit protection; landing calls to action share the same color. Preserved the user's current sign-in photo positioning.
+- Guest course requests remain disabled; signed-in users see up to six courses plus the full-course link. Course errors now offer retry; loading and empty states remain explicit. Existing course/detail/login/dashboard routes retained.
+- TypeScript, production build and focused whitespace checks passed. Headless Edge fixture checks at 1440/390/320px passed: no horizontal overflow, guest course isolation, authenticated courses/links, FAQ/mobile navigation, exact primary color and disabled opacity during mock login. Screenshots inspected under storage/app/ui-checks. Mobile photo-caption overlap corrected after inspection. Final production build passed (existing chunk warning). All landing icons now use the installed PrimeIcons font (buttons, mobile menu, features, categories, FAQ, testimonial decoration and footer); inline SVG and text-symbol icons were removed. Final browser rerun passed at all three widths, including PrimeIcons font loading, absence of inline SVG, navigation, FAQ and Sign In color/disabled checks. Fixtures omit external font requests; no live login/database writes.
+
+Quiz loading layout, participant history and failure feedback (2026-10-09):
+- Replaced the separate loading page with shared statistics, bank creation, list heading, labeled filters and pagination; only values/question contents use placeholders. The quiz workspace now has an explicit full width to prevent content-dependent horizontal resizing. Filters and bank creation stay disabled until ready.
+- Renamed visible history headings/navigation to Riwayat Kuis. History now provides name/username search, participant selection and reset. Options include only people with attempts in the caller's authorized history/batch scope, including historical accounts; participant filtering resets pagination and stale results are cleared during reload. Existing URLs and ownership/release checks remain intact.
+- Batched question-option and legacy class-membership reads to remove per-row queries from management loading. Quiz/history errors now distinguish timeouts, expired sessions, permissions, server failures and unreachable network instead of labeling every failure as a disconnected connection. The reported live failure has not been reproduced; quiz HTTP timeout is 15 seconds.
+- Verified 11 focused backend tests / 166 assertions plus option-query regression 1 test / 8 assertions, all SQLite memory; error classification test and TypeScript passed. Final build and whitespace checks passed (existing chunk warning). Headless Edge with synthetic delayed responses passed at 1440/390px: loading/loaded hero, statistics, tabs, bank panel, list heading, filters and list origin/width match within 2px; participant search/select/reset, detail review, no page overflow or runtime exceptions. External Google font requests were omitted from the isolated fixture to avoid a network-dependent render block. No live database writes or migrations.
+
+Quiz management loading and sign-in button (2026-10-09):
+- /quiz/manage now shows responsive skeletons for statistics, bank creation, filters and question cards, with an accessible loading status and reduced-motion support. Tabs stay disabled until metadata/questions are ready; initial load and retry share the same handler.
+- Sign In retains its processing-disabled state and now visibly fades to 50% opacity with a disabled cursor and no hover color change. The submit handler also ignores duplicate submissions while processing.
+- TypeScript and focused whitespace checks passed. Headless Edge checks with delayed synthetic responses passed at 1440/390px: loading placeholders, disabled/enabled tabs, loaded questions, no page overflow or runtime exceptions. Visual inspection prompted an additional grid constraint to keep mobile statistic placeholders within their cards. Final production build passed (existing chunk-size warning); compiled Sign In asset includes the disabled fade. Live login was not exercised.
+
+Sign-in image panel (2026-10-09):
+- Auth/SignIn.vue now uses the current discuss.png with full-panel cover sizing and object-position 50% 65% to focus on the people below the photo's empty upper wall. Removed the adjacent flex wrapper that squeezed and shifted the image; the landing link overlays the panel with a readable dark background. This supersedes the previous contain treatment.
+- Verified production build and focused whitespace check passed (existing chunk-size warning). Browser visual verification remains outstanding.
+
+Learning history and workspace redesign (2026-10-08):
+- Added /riwayat-belajar, Bank Soal & Peserta history tab, batch history tab and participant links. Participant ownership, trainer quiz/batch ownership and current score/answer-release rules are enforced; submitted own history remains readable after batch/course access ends. Old attempts stay explicitly unversioned/unattributed rather than guessing prior content or batch.
+- New attempts capture immutable quiz/question/options/keys/weight/explanation plus course material text/file-reference snapshots. Answer validation, scoring, review and essay grading use recorded questions. Completed-material filtering prevents student history from exposing later locked lessons. Essay regrading records before/after points, feedback, actor and time. Content edits/deletes additionally retain before/after content snapshots.
+- Pelatihan Saya propagates validated batch context into quiz starts and return links. Quiz attempt quotas and aggregates are scoped per batch, preserving global attempt IDs/numbers; simultaneous starts across contexts are rejected. Fixed the previously failing prerequisite regression for legacy unfinished attempts. Date/member/status edits do not rewrite existing snapshots or scores.
+- Redesigned Bank Soal & Peserta and Batch Pelatihan with purple/Poppins styling, SVG metric icons, real counts, searchable/paginated employee and batch cards, filters, progressive details, native history review dialogs and guarded editing. Corrected font fallback and encoding issues found during visual inspection. Kept legacy quiz-class tables/endpoints intact.
+- Applied ONLY 2026_10_08_000002_create_learning_history.php to the configured shared database (four new history tables). No old attempts, answers, scores, batch statuses or memberships were modified/backfilled. No test employees or quiz attempts were created live.
+- Verified combined backend: 53 tests / 737 assertions on SQLite memory; 24 frontend authoring/flow/progress tests; TypeScript, production build and focused whitespace checks passed. Follow-up history test after request-local snapshot caching: 5 tests / 69 assertions passed. Browser checks on Edge at 1440 and 390 pixels passed with synthetic data: tabs, pagination, history modal, batch detail/edit, student batch context, no horizontal overflow or JS exceptions. Screenshots inspected in storage/app/ui-checks. Existing build chunk-size warning remains; authenticated live-employee end-to-end verification not performed.
+- Scope: snapshots freeze history at attempt start, NOT a shared class version at batch activation. Material progress remains cumulative; external/file bytes are referenced, not archived. Pinning full class versions per batch and resetting material progression remain future work. See docs/LEARNING-HISTORY.md for behavior and limitations.
+
+
+Participant batch learning guidance and discovery (2026-10-08):
+- Read-only live diagnosis found both existing batches (IDs 1 and 2) explicitly marked completed, despite end dates still being in the future. Such batches correctly do not grant additional course access. No live status, membership or progress changes were made.
+- Added a participant-only learning feed and shared Pelatihan Saya component in both Pembelajaran and Batch Pelatihan. Assigned courses remain visible independently of catalog pagination, with progress and Mulai/Lanjutkan Belajar/Buka Kembali actions. Students receive learning instructions instead of the batch-management guide.
+- Scheduled, expired and trainer-closed batches explain why batch access is unavailable and what to ask the trainer. Completed is labeled Ditutup oleh trainer, separate from learner completion. Buttons follow actual CourseAudience access, including independent position/direct/other-batch access. Manager status field now explains that Selesai closes access; course catalog requests refresh on entry and batch saves invalidate its cache.
+- Verified 16 backend tests / 208 assertions on SQLite memory, including participant isolation, closed/scheduled/expired/reactivated states, independent access, progress and assigned courses beyond the first catalog page. TypeScript, focused whitespace check and production build passed (existing large-chunk warning). Authenticated browser walkthrough remains outstanding. Usage guide updated in docs/TRAINING-BATCHES.md.
+
+
+Training batches first usable version (2026-10-08):
+- Added `/batch-pelatihan` and a sidebar link for managers and participants. Includes an Indonesian usage guide, batch cards, draft/active/completed lifecycle, period, editable employee membership, shared course selection, and cumulative participant/course progress. Student detail exposes only their own membership/progress; trainers manage only their own batches, admins all. Forms preserve validation errors and guard unsaved navigation; updates reject stale versions.
+- Active memberships grant additional course access within the inclusive date period. Course lists, material/progress endpoints and linked quiz authorization share that access. Also aligned course-list filtering with existing direct participant grants. Other existing access paths and historical progress remain intact. Reports use batched reads and resolve employee names through db2; completed quiz attempts count as progress, not necessarily passing grades.
+- Applied ONLY `2026_10_08_000001_create_training_batches.php` to the configured shared LMS database, creating training_batches, training_batch_members and training_batch_courses. Existing legacy classes/quiz tables were not changed; no sample batches or employees were inserted.
+- Verified 14 backend tests / 179 assertions on SQLite memory (both databases), including role/ownership/privacy, membership/date access, overlapping batches, inactive history, existing material/quiz progress, validation and stale edits. TypeScript and route registration passed; production build passed with the existing large-chunk warning. Authenticated browser verification remains outstanding.
+- First-version limits: progress and quiz attempts remain cumulative per employee/course, with no reset or separate recertification results per batch; individual employee search only, no bulk position/branch selection or separate trainer assignment. Up to 200 members / 20 courses. Usage and behavior documented in docs/TRAINING-BATCHES.md.
+
+
+Employee source for quiz participants (2026-10-08):
+- Quiz metadata now lists active employee-backed accounts from db2 (`db_gadaimulia`, `auth.users` joined to `master.employee`/`master.position`), including accounts that have never logged into LMS. Names and displayed roles come from this directory; quiz identity requires an active employee account. Authorization retains the verified session position policy.
+- Results and attempt reviews resolve current employee names, retaining historical inactive participants. Assignment/override validation rejects inactive or LMS-only users. Removed the local user/role editor; its existing POST endpoint rejects changes with 405 for admins.
+- User confirmed: retain `lms_users` ONLY as the numeric-ID bridge required by existing shared-database quiz foreign keys and history. Missing bridge rows are inserted from employee accounts; existing IDs, names and roles are not overwritten. Employee data remains authoritative in `db_gadaimulia`. No live migrations or data writes were performed during implementation.
+- Final focused SQLite-memory verification: 6 passed / 93 assertions (employee source, inactive history, assignment/role boundaries, analytics and course participant totals). Production build and focused whitespace check passed (existing large-chunk warning). Expanded SQLite-memory run: 43 passed, 6 failed / 585 assertions. Both new employee-source/history regressions pass. Remaining failures concern existing course-list/sequence audience expectations, manager-position middleware expectations, and the pre-existing component-name typo in the document-create page; these areas were not changed. Authenticated live/browser verification remains outstanding.
+
+
+Quiz navigation status boxes (2026-10-07):
+- Replaced table-cell legend markers and conflicting inline dimensions with a two-column semantic list and consistent 28px square markers. Navigation numbers use square proportions and centered labels.
+- Active questions have a purple border; answered green and flagged yellow backgrounds remain visible when active. Other legend states retain matching navigation colors.
+- Production build and focused whitespace check passed (existing large-chunk warning). No answer/navigation logic or data changes. Browser visual verification remains outstanding.
+
+Passing-grade validation correction (2026-10-07):
+- Corrected a reversed backend comparison that rejected passing grades below the selected questions' total weight. A threshold such as 70 out of 100 now saves; thresholds exceeding the total still fail, matching the existing frontend validation. Applies to save and publish through the shared validator.
+- Verified 2 focused backend tests / 28 assertions on SQLite memory, including saving 70/100, below/equal/above-total cases and total weight above 100; 9 frontend quiz-flow tests and focused whitespace check passed. No frontend source changes or live data mutations; browser verification not performed.
+
+Used bank question editing (2026-10-07):
+- Bank question lists now include server-computed usage. Used questions offer “Edit Versi Baru”, with a dialog/save label explaining that the new bank entry must be selected in the quiz editor; existing quizzes and participant history retain the original question.
+- Bank edits explicitly opt into version creation when used, including usage discovered only at save time. Unused edits keep their ID. Backend ownership, validation and default used-question protection remain enforced; original options/answer references are preserved. No schema or live data changes.
+- Verified 3 focused backend tests / 75 assertions on SQLite memory, including linked/historical usage, unchanged old questions/options/answers, unused edits and unauthorized requests. TypeScript, focused whitespace checks and production build passed (existing large-chunk warning). Browser verification remains outstanding.
+
+Uploaded question image preview fix (2026-10-07):
+- User clarified the failure was the image preview after upload. Replaced disk-generated direct image URLs with a same-origin authenticated image route for upload responses, bank/random selections, quiz previews and attempt/results payloads. It streams from the configured public disk, supporting private MinIO and local files without public/storage links. Saved paths remain unchanged.
+- Added strict filename/extension routing, missing-file response and nosniff/private cache headers. QuizRequestGuard now sets headers through the response header bag to support streamed images. The upload preview shows a retryable message when an image cannot load.
+- Verified 2 focused backend tests / 51 assertions on SQLite + fake storage: returned-URL image reads with local/S3 configuration, image bytes/MIME, student access, guest denial, missing files and existing authoring behavior. Route listing, whitespace check and production build passed. Existing large-chunk warning remains. No new migrations or live file changes; browser/private-bucket image loading remains unverified.
+
+Performance optimizations for announcement and query responses (2026-10-07):
+- Replaced slow subquery in `AnnouncementController` `regions_only` endpoint with `pluck('id')`, using indexed `document_id` lookups directly.
+- Excluded heavy `content` HTML field from document list queries in `AnnouncementService` to reduce payload and memory footprint during card/table pagination.
+- Updated `queryClient` default `staleTime` to 60 seconds for instant in-memory client-side response caching across tab/page switches.
+- Verified backend `Announcement` unit/feature tests, strict `npm run typecheck`, and production Vite build successfully.
+
+Question images and active quiz sidebar (2026-10-07):
+- Bank Soal & Peserta now uses the existing active sidebar style and aria-current for `/quiz/manage` and its editor/preview/results descendants.
+- Added optional question images to both bank and quiz-editor question forms through a shared upload/preview/remove control. JPG/PNG/WebP only, max 5 MB and 8000×8000 pixels; saving/closing waits for upload. Uploads use the configured public disk, manager authorization, generated filenames and validated owner-scoped paths. Removing/replacing a reference does not delete files still used by other questions/history.
+- Images persist through question edits/copies, render in bank/editor, quiz previews, student attempts/reviews and manager answer review. Existing used-question immutability and answer-release controls remain enforced.
+- Applied only `2026_10_07_000001_add_image_path_to_questions.php` to add nullable `questions.image_path` on the configured LMS database. No existing questions/answers were rewritten and no live test images were uploaded.
+- Verified 4 focused backend tests / 61 assertions on SQLite + fake storage, 9 frontend authoring/review tests, strict TypeScript, PHP lint, route registration, production build and whitespace check. Updated one legacy authoring test fixture to supply its trainer position code. The separate DOM editor test cannot start because local native `canvas.node` is missing; authenticated browser upload verification remains outstanding. Existing large-chunk warning remains.
+
+Student completed/next-material navigation (2026-10-07):
+- User confirmed “h+1 checklist” means the next material after completion, not a one-day delay. Student sidebar access now derives from saved progress: completed items and the first unfinished item are openable, later unfinished items stay locked. Revisiting completed material no longer re-locks the next active item; opening an already-completed later item cannot unlock unfinished gaps. Sidebar disabled state, lock icon and click guard use the same predicate.
+- CourseSequence allows reopening recorded completed items even after content reordering. ContentController show now checks course access and the student sequence guard; manager navigation retains its separate behavior. Completion records are preserved.
+- Verified 8 frontend course-progress tests, CourseProgressTest on SQLite memory (5 tests / 38 assertions), PHP lint, whitespace check and production Vite build. Existing bundle-size warning remains. No live database/progress changes; authenticated browser walkthrough remains outstanding.
+
+Course detail loading skeleton (2026-10-07):
+- `/kelas/{id}` now uses an explicit request-loading state and a responsive full-page skeleton matching its header/actions, thumbnail, four statistics, participants panel and material list. Loaded controls and child panels mount only after course data arrives; request failures show a retry action.
+- Missing/broken thumbnails show a static fallback rather than an endless animated placeholder. Student totals display an unknown marker until the participants request supplies the count. Skeleton respects reduced-motion preferences and announces loading accessibly.
+- Verified production Vite build and whitespace check; fallback icon exists. Existing large-chunk warning remains. No database changes; authenticated visual browser verification remains outstanding.
+
+Missing course content-order endpoints (2026-10-07):
+- Fixed the reported `api/courses/59/content-order` route-not-found error: frontend calls existed, but both route registrations and backend order handling were absent. Added GET/PATCH endpoints under `/api/courses/{id}/content-order` and `/api/v1/courses/{id}/content-order`.
+- New CourseContentOrderController follows existing course-manager roles, returns all materials/quizzes in saved order, validates the complete ID set, rejects stale original order with 409, and saves inside a transaction with row locks. Other courses and quiz links remain unchanged.
+- Verified CourseOrderTest: 2 tests / 25 assertions on SQLite memory, covering read/save, preview order, guest/student denial, foreign/duplicate/missing IDs, stale submissions and missing courses. Route listing confirms all 4 endpoints; whitespace check passed. No live course order or database changes. Frontend unchanged.
+
+TypeScript ImportMeta env fix (2026-10-07):
+- Fixed `Property 'env' does not exist on type 'ImportMeta'` error in `resources/js/utils/axios.ts` by creating `resources/js/env.d.ts` with Vite client type references and adding `"types": ["vite/client"]` to `tsconfig.json`.
+- Verified `npm run typecheck` (`tsc --noEmit`) passes with 0 errors.
+
+Document list and tabs appear together (2026-10-07):
+- User requested simultaneous display of documents and region tabs. Detail now starts document pages and region/tab data together and keeps the existing skeleton until all finish, then reveals the list and usable tabs together. Batched backend requests remain unchanged.
+- Any document-page or region failure shows a page-level error with a retry that reloads both sets; incomplete content is not revealed. This supersedes the earlier progressive visual display. Loading time still depends on the slower database/region requests.
+- Verified 5 focused frontend tests covering both completion orders, region failure/retry, later-page failure and document timeout recovery; production Vite build and whitespace check passed. Existing bundle-size warning remains. No database changes; browser visual verification remains outstanding.
+
+Confirmed document-list timeout and progressive loading (2026-10-07):
+- User confirmed the document-request timeout on `/detail-pengumuman/1`. Read-only live checks found 118 active documents, 2,368 bytes of text content and 1,501 region assignments; connection/count requests could complete quickly while full reads stalled. A 20-document read took ~3.7 seconds in one probe and ~14 seconds in another. No data modifications.
+- Added opt-in `page` to `/announcement/{id}` with 20 records per response and stable date/ID ordering; requests without page retain the legacy full-list contract. The detail page renders the first page, retrieves remaining pages progressively, retains earlier data on failure and retries the failed page. Region filters wait for the complete list to avoid silently filtering partial data. Region relationships select only document/region IDs.
+- Increased only announcement-detail request timeout to 60 seconds. Optional region directory loading remains separate and Inertia provides auth. Database/network latency is still variable; an authenticated end-to-end browser check remains outstanding.
+- A complete paged live probe took 56.7 seconds, with 55.6 seconds in the document-region relation read despite an existing composite primary key. Final implementation excludes region relationships from paged list requests via `include_regions=0` and loads them separately via `regions_only=1`; the latter applies the same document audience scope. The list no longer waits for region assignments. Final live first-page service probe: 20 documents in 4.17 seconds including connection setup. Underlying region/database latency remains unresolved, but no longer blocks initial document loading.
+- Verified 3 frontend regression tests, SQLite AnnouncementListTest (1 test / 14 assertions) covering paging, region shape, omitted-region query count and audience preservation, TypeScript check, PHP lint, whitespace check and production build. Existing bundle-size warning remains.
+
+Document detail loading follow-up (2026-10-07):
+- User identified `/detail-pengumuman/1` as the failing page. It previously awaited documents, employee-directory regions and `/session` together, so any auxiliary timeout prevented the document list from rendering.
+- Detail now uses Inertia auth, renders documents before requesting optional region tabs, retains the All tab when region loading fails, and provides independent retry/error states. Existing server-side audience restrictions are unchanged. Removed unnecessary DISTINCT from the document query (no joined rows to deduplicate).
+- Verified 2 frontend regressions: pending/failed region requests do not block documents, and document timeout can recover via retry. SQLite category regression: 1 test / 5 assertions; production build and whitespace check passed. Existing bundle-size warning remains. No live database writes or permission changes.
+- Exact failing live endpoint and browser access remain unverified; asked whether the user sees persistent loading, a blank page or HTTP 403/500. This change addresses auxiliary-request failures, not an independently confirmed database/network outage.
+
+Document category list timeout mitigation (2026-10-07):
+- Category counts now use a single SQL aggregate query instead of loading every matching document and its content into PHP. Existing position/branch restrictions, empty categories and archived-document exclusion remain unchanged.
+- Category cards use Inertia auth props directly, removing the additional `/session` request and its failure dependency. Failed list requests now show an Indonesian error with a retry button instead of a misleading empty state. Axios timeout and uploads unchanged.
+- Verified AnnouncementListTest on SQLite memory: 1 test / 5 assertions; 7 focused frontend tests; PHP lint, production Vite build and whitespace check passed. Existing large-chunk warning remains. PHPUnit was invoked directly with SQLite extensions because artisan's test subprocess did not inherit CLI extension flags.
+- No live database changes. Actual authenticated request timing and the user's timeout have not been reproduced; check the failing endpoint/network/database latency if the problem persists. Existing user edits in config/access.php and config/pages.php were preserved.
+
 Role access resolver (2026-10-05):
 - Menyatukan resolusi role pada `RoleAccess` berbasis `auth.idgrup`; nilai `auth.role` dari client/session tidak dapat menaikkan akses. `LmsAccess` tetap dipertahankan sebagai adapter untuk pemanggil lama.
 - Menyelaraskan mapping jabatan: JBT-032/JBT-038 admin, JBT-037/JBT-039/JBT-040/JBT-020/JBT-SOP SOP, serta 042/JBT-019/JBT-TRAINER trainer. Perubahan hanya pada tiga file otorisasi, tanpa mempersingkat file fitur lain.
@@ -151,4 +319,8 @@ CSRF & Session 419 Page Expired Resolution (2026-09-28):
 - Added 419 status response interceptors in `quiz/api.js` and `utils/axios.js` to automatically refresh/reload when session tokens expire.
 - Configured exception handler in `bootstrap/app.php` to handle 419 status gracefully for Inertia and JSON requests instead of rendering unhandled error pages.
 
-- Fixed SOP document visibility: Sidebar and document actions now use resolved uth.role (dmin/sop) instead of hardcoded jabatan checks. Added clean role middleware aliases ole.admin, ole.sop, ole.trainer, and ole.users backed by the same Sopiga session resolver. Frontend production build passed.
+- Fixed SOP document visibility: Sidebar and document actions now use resolved uth.role (dmin/sop) instead of hardcoded jabatan checks. Added clean role middleware aliases
+ole.admin,
+ole.sop,
+ole.trainer, and
+ole.users backed by the same Sopiga session resolver. Frontend production build passed.

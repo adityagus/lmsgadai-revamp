@@ -42,6 +42,20 @@ class CourseController extends Controller
         return CourseResource::collection($courses);
     }
 
+    public function popular()
+    {
+        $courses = \App\Models\Course::query()->where('is_popular', true)
+            ->orderByDesc('id')->get(['id', 'name', 'description', 'thumbnail']);
+
+        return response()->json(['data' => $courses->map(fn ($course) => [
+            'id' => $course->id,
+            'name' => $course->name,
+            'description' => $course->description,
+            'thumbnail_url' => $course->thumbnail
+                ? config('services.mix.img_url').ltrim($course->thumbnail, '/') : null,
+        ])]);
+    }
+
     /**
      * Display the specified course with contents.
      *

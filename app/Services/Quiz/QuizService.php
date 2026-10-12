@@ -11,14 +11,8 @@ class QuizService
     {
         $username = $request->session()->get('auth.user');
         abort_unless($username && $request->session()->get('auth.status') === 'login', 401);
-        DB::table('lms_users')->insertOrIgnore([
-            'username' => $username,
-            'name' => $request->session()->get('auth.nama', $username),
-            'role' => 'student',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $user = DB::table('lms_users')->where('username', $username)->first();
+        $user = app(EmployeeParticipants::class)->findActive($username);
+        abort_unless($user, 403, 'Akun karyawan tidak aktif atau tidak ditemukan.');
         $user->role = app(\App\Services\LmsAccess::class)->role($request);
         $user->position = $request->session()->get('auth.idgrup');
         $user->branch = $request->session()->get('auth.cabang');
@@ -40,14 +34,11 @@ class QuizService
         return $quiz;
     }
 
-    public function validatePassingGrade($grade, $questionIds, $field = 'passing_grade')
+    public function validatePassingGrade($grade, $field = 'passing_grade')
     {
-        $total = round((float) DB::table('questions')->whereIn('id', $questionIds)->sum('weight'), 2);
-        if ($total > 100 || round((float) $grade, 2) < $total) {
+        if (!is_numeric($grade) || !is_finite((float) $grade) || (float) $grade < 0 || (float) $grade > 100) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                $field => $total > 100
-                    ? 'Total bobot soal '.$total.' poin melebihi skala nilai 100. Kurangi bobot soal.'
-                    : 'Nilai minimal lulus tidak boleh kurang dari total bobot soal ('.$total.' poin).',
+                $field => 'Nilai minimal lulus harus antara 0 dan 100.',
             ]);
         }
     }
@@ -83,21 +74,28 @@ class QuizService
                 ->where('quiz_id', $quiz->id)->where('student_id', $student)->exists();
     }
 
-    public function start($quiz, $user)
+    public function start($quiz, $user, $batchId = null)
     {
-        return DB::transaction(function () use ($quiz, $user) {
+        return DB::transaction(function () use ($quiz, $user, $batchId) {
             // Serialize starts for a student, including the first attempt, across browser tabs.
             DB::table('lms_users')->where('id', $user->id)->lockForUpdate()->first();
             $quiz = DB::table('quizzes')->where('id', $quiz->id)->lockForUpdate()->first();
             abort_unless($quiz->status === 'PUBLISHED' && $this->assigned($quiz, $user), 403);
+            if ($user->role === 'student') app(\App\Services\CourseSequence::class)->assertQuizUnlocked($quiz, $user->username);
+            $history = app(AttemptHistory::class);
+            $batch = $history->batch($quiz, $user->username, $batchId);
             $active = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id)->where('status', 'IN_PROGRESS')->first();
             if ($active) {
+                $record = $history->read($active->id);
+                abort_if((int) ($record->batch_id ?? 0) !== (int) ($batch?->id ?? 0), 409, 'Masih ada percobaan aktif dari penugasan lain. Selesaikan percobaan tersebut terlebih dahulu.');
                 $this->expire($active->id);
                 return $active->id;
             }
             $settings = $this->settings($quiz, $user->id);
             abort_if(($settings['from'] && now()->lt($settings['from'])) || ($settings['until'] && now()->gte($settings['until'])), 422, 'Quiz di luar periode pengerjaan.');
-            $count = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id)->count();
+            $allAttempts = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $user->id);
+            $count = $history->scope(clone $allAttempts, $batch?->id)->count();
+            $nextAttempt = 1 + (int) $allAttempts->max('attempt_number');
             abort_if($settings['maximum'] > 0 && $count >= $settings['maximum'], 422, 'Batas attempt sudah tercapai.');
             $questions = DB::table('quiz_questions')->where('quiz_id', $quiz->id)->orderBy('position')->pluck('question_id')->all();
             if ($quiz->randomize_question) {
@@ -108,11 +106,12 @@ class QuizService
             $id = DB::table('quiz_attempts')->insertGetId([
                 'quiz_id' => $quiz->id,
                 'student_id' => $user->id,
-                'attempt_number' => $count + 1,
+                'attempt_number' => $nextAttempt,
                 'started_at' => now(),
                 'expired_at' => $settings['until'] ? now()->addMinutes($settings['minutes'])->min($settings['until']) : now()->addMinutes($settings['minutes']),
                 'status' => 'IN_PROGRESS',
             ]);
+            $history->capture($id, $quiz, $user, $batch);
             foreach ($questions as $position => $question) {
                 $options = DB::table('question_options')->where('question_id', $question)->orderBy('id')->pluck('id')->all();
                 if ($quiz->randomize_answer) {
@@ -134,9 +133,12 @@ class QuizService
         } else {
             abort_unless($attempt->student_id === $user->id, 403);
             $quiz = $this->quiz($attempt->quiz_id);
-            abort_unless($quiz->course_id
+            if ($user->role === 'student' && $attempt->status === 'IN_PROGRESS' && !app(AttemptHistory::class)->read($attempt->id)) {
+                app(\App\Services\CourseSequence::class)->assertQuizUnlocked($quiz, $user->username);
+            }
+            abort_unless($attempt->status !== 'IN_PROGRESS' || ($quiz->course_id
                 ? app(\App\Services\CourseAudience::class)->allows((int) $quiz->course_id, request())
-                : app(QuizAudience::class)->allows($attempt->quiz_id, $user),
+                : app(QuizAudience::class)->allows($attempt->quiz_id, $user)),
                 403,
                 'Anda tidak termasuk peserta yang diizinkan mengakses kuis ini.');
         }
@@ -169,7 +171,7 @@ class QuizService
             $expired = now()->gte(Carbon::parse($a->expired_at));
             foreach ($this->answerRows($id) as $row) {
                 $selected = json_decode($row->selected_options ?? '[]', true);
-                $points = $row->type === 'essay' ? (strlen(trim($row->essay ?? '')) ? null : 0) : self::objectivePoints($selected, DB::table('question_options')->where('question_id', $row->question_id)->where('is_correct', true)->pluck('id')->all(), $row->weight);
+                $points = $row->type === 'essay' ? (strlen(trim($row->essay ?? '')) ? null : 0) : self::objectivePoints($selected, $this->optionsForAttempt($id, $row->question_id)->where('is_correct', true)->pluck('id')->all(), $row->weight);
                 DB::table('student_answers')->where('id', $row->answer_id)->update(['points' => $points]);
             }
             DB::table('quiz_attempts')->where('id', $id)->update(['status' => $expired ? 'AUTO_SUBMITTED' : 'SUBMITTED', 'submitted_at' => $expired ? $a->expired_at : now()]);
@@ -179,11 +181,32 @@ class QuizService
 
     public function answerRows($id)
     {
-        return DB::table('quiz_attempt_questions as aq')->join('questions as q', 'q.id', '=', 'aq.question_id')
+        $rows = DB::table('quiz_attempt_questions as aq')->join('questions as q', 'q.id', '=', 'aq.question_id')
             ->join('quiz_attempts as attempt', 'attempt.id', '=', 'aq.attempt_id')
             ->leftJoin('quiz_questions as qq', function ($join) { $join->on('qq.quiz_id', '=', 'attempt.quiz_id')->on('qq.question_id', '=', 'aq.question_id'); })
             ->join('student_answers as a', 'a.attempt_question_id', '=', 'aq.id')->where('aq.attempt_id', $id)->orderBy('aq.position')
-            ->select('aq.*', 'q.question', 'q.type', 'q.weight', DB::raw('COALESCE(qq.explanation, q.explanation) as explanation'), 'q.difficulty', 'a.id as answer_id', 'a.selected_options', 'a.essay', 'a.flagged', 'a.visited', 'a.revision', 'a.points', 'a.feedback')->get();
+            ->select('aq.*', 'q.question', 'q.image_path', 'q.type', 'q.weight', DB::raw('COALESCE(qq.explanation, q.explanation) as explanation'), 'q.difficulty', 'a.id as answer_id', 'a.selected_options', 'a.essay', 'a.flagged', 'a.visited', 'a.revision', 'a.points', 'a.feedback')->get();
+        $snapshot = app(AttemptHistory::class)->read($id);
+        if ($snapshot) {
+            $questions = collect($snapshot->snapshot->questions)->keyBy('id');
+            foreach ($rows as $row) {
+                $question = $questions->get($row->question_id);
+                abort_unless($question, 409, 'Rekaman versi soal tidak lengkap.');
+                foreach (['question', 'image_path', 'type', 'weight', 'explanation', 'difficulty'] as $field) $row->$field = $question->$field ?? null;
+            }
+        }
+        return $rows;
+    }
+
+    public function optionsForAttempt($attemptId, $questionId)
+    {
+        $history = app(AttemptHistory::class)->read($attemptId);
+        if ($history) {
+            $question = collect($history->snapshot->questions)->firstWhere('id', $questionId);
+            abort_unless($question, 409, 'Rekaman versi soal tidak lengkap.');
+            return collect($question->options);
+        }
+        return DB::table('question_options')->where('question_id', $questionId)->get();
     }
 
     public function recalculate($id)
@@ -217,14 +240,24 @@ class QuizService
     public function payload($attempt, $manager = false)
     {
         $quiz = $this->quiz($attempt->quiz_id);
+        $history = app(AttemptHistory::class)->read($attempt->id);
+        if ($history) {
+            // Release controls stay with the trainer; the historical assessment and grading scale are fixed.
+            foreach (['title', 'description', 'course_id', 'passing_grade', 'grading_method'] as $field) {
+                $quiz->$field = $history->snapshot->quiz->$field;
+            }
+        }
         $finished = $attempt->status !== 'IN_PROGRESS';
-        $release = $finished && (!empty($quiz->no_schedule) || !$quiz->release_after_close || now()->gte(Carbon::parse($quiz->available_until)->max($this->settings($quiz, $attempt->student_id)['until'])));
+        $release = $this->released($quiz, $attempt);
         $data = [
             'id' => $attempt->id,
+            'recorded_version' => $history?->version,
+            'batch_id' => $history?->batch_id,
+            'batch_name' => $history?->batch_name,
             'quiz_id' => $quiz->id,
             'course_id' => $quiz->course_id,
             'title' => $quiz->title,
-            'student' => DB::table('lms_users')->where('id', $attempt->student_id)->value('name'),
+            'student' => app(EmployeeParticipants::class)->names([$attempt->student_id])->get($attempt->student_id),
             'classes' => $quiz->course_id ? DB::table('courses')->where('id', $quiz->course_id)->pluck('name') : DB::table('classes')->join('class_students', 'class_students.class_id', '=', 'classes.id')->where('student_id', $attempt->student_id)->pluck('name'),
             'status' => $attempt->status,
             'attempt_number' => $attempt->attempt_number,
@@ -237,7 +270,7 @@ class QuizService
         ];
         if ($manager || ($release && $quiz->show_score)) {
             $data['score'] = $attempt->score;
-            $data['aggregate_score'] = $this->aggregate($quiz, $attempt->student_id);
+            $data['aggregate_score'] = $this->aggregate($quiz, $attempt->student_id, $history?->batch_id, true);
         }
         if ($manager || ($release && $quiz->show_total_correct)) {
             foreach (['total_correct', 'total_wrong', 'total_unanswered'] as $key) {
@@ -251,8 +284,9 @@ class QuizService
         $data['questions'] = [];
         if (!$finished || $manager || ($release && ($quiz->show_correct_answer || $quiz->show_wrong_answer || $quiz->show_explanation))) {
             foreach ($this->answerRows($attempt->id) as $row) {
-                $options = DB::table('question_options')->where('question_id', $row->question_id)->get()->keyBy('id');
+                $options = $this->optionsForAttempt($attempt->id, $row->question_id)->keyBy('id');
                 $item = ['id' => $row->id, 'position' => $row->position, 'question' => $row->question, 'type' => $row->type, 'options' => [], 'selected_options' => json_decode($row->selected_options ?? '[]', true), 'essay' => $row->essay ?? '', 'flagged' => (bool) $row->flagged, 'visited' => (bool) $row->visited, 'revision' => $row->revision];
+                $item['image_url'] = QuestionImage::url($row->image_path);
                 foreach (json_decode($row->option_order, true) as $oid) {
                     $o = ['id' => $oid, 'text' => $options[$oid]->text];
                     if ($manager || ($release && $quiz->show_correct_answer)) {
@@ -277,9 +311,19 @@ class QuizService
         return $data;
     }
 
-    public function aggregate($quiz, $student)
+    public function released($quiz, $attempt): bool
     {
-        $scores = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $student)->where('status', '!=', 'IN_PROGRESS')->orderBy('attempt_number')->pluck('score');
+        if ($attempt->status === 'IN_PROGRESS') return false;
+        if (!empty($quiz->no_schedule) || !$quiz->release_after_close) return true;
+        $until = $this->settings($quiz, $attempt->student_id)['until'];
+        if ($quiz->available_until) $until = $until ? $until->max(Carbon::parse($quiz->available_until)) : Carbon::parse($quiz->available_until);
+        return $until && now()->gte($until);
+    }
+
+    public function aggregate($quiz, $student, ?int $batchId = null, bool $scoped = false)
+    {
+        $query = DB::table('quiz_attempts')->where('quiz_id', $quiz->id)->where('student_id', $student)->where('status', '!=', 'IN_PROGRESS')->orderBy('attempt_number');
+        $scores = ($scoped ? app(AttemptHistory::class)->scope($query, $batchId) : $query)->pluck('score');
         if (!$scores->count() || $scores->containsStrict(null)) {
             return null;
         }

@@ -6,6 +6,7 @@ use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\api\CourseController;
 use App\Http\Controllers\api\CourseProgressController;
 use App\Http\Controllers\api\CourseParticipantController;
+use App\Http\Controllers\api\CourseContentOrderController;
 use App\Http\Controllers\api\MasterController;
 use App\Http\Controllers\api\WizardController;
 use App\Http\Controllers\api\ContentController;
@@ -54,6 +55,8 @@ Route::middleware(['web', 'api'])->prefix('api')->group(function () {
     Route::get('/course-access-options', [CourseController::class, 'accessOptions'])->middleware('session.auth');
     Route::get('/courses/{id}/access', [CourseController::class, 'access'])->middleware('session.auth');
     Route::get('/courses/{id}', [CourseController::class, 'show'])->middleware('session.auth');
+    Route::get('/courses/{id}/content-order', [CourseContentOrderController::class, 'index'])->middleware('session.auth');
+    Route::patch('/courses/{id}/content-order', [CourseContentOrderController::class, 'update'])->middleware('session.auth');
     Route::get('/courses/{id}/progress', [CourseProgressController::class, 'show'])->middleware('session.auth');
     Route::post('/courses/{id}/progress/{contentId}', [CourseProgressController::class, 'complete'])->middleware('session.auth');
     Route::post('/courses/{id}/progress/{contentId}/complete', [CourseProgressController::class, 'complete'])->middleware('session.auth');

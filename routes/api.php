@@ -7,6 +7,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\api\CourseController;
 use App\Http\Controllers\api\CourseProgressController;
 use App\Http\Controllers\api\CourseParticipantController;
+use App\Http\Controllers\api\CourseContentOrderController;
 use App\Http\Controllers\api\MasterController;
 use App\Http\Controllers\api\WizardController;
 use App\Http\Controllers\api\ContentController;
@@ -14,6 +15,20 @@ use App\Http\Controllers\InformationController;
 use App\Http\Controllers\api\FileUploadController;
 use App\Http\Controllers\api\AnnouncementController;
 use App\Http\Controllers\api\DocumentViewController;
+
+Route::middleware('session.auth')->group(function () {
+    Route::get('/learning-history', [\App\Http\Controllers\api\LearningHistoryController::class, 'index']);
+    Route::get('/learning-history/{id}', [\App\Http\Controllers\api\LearningHistoryController::class, 'show'])->whereNumber('id');
+});
+
+Route::prefix('training-batches')->middleware('session.auth')->group(function () {
+    Route::get('/', [\App\Http\Controllers\api\TrainingBatchController::class, 'index']);
+    Route::get('/options', [\App\Http\Controllers\api\TrainingBatchController::class, 'options']);
+    Route::get('/my-learning', [\App\Http\Controllers\api\TrainingBatchController::class, 'learning']);
+    Route::post('/', [\App\Http\Controllers\api\TrainingBatchController::class, 'save']);
+    Route::get('/{id}', [\App\Http\Controllers\api\TrainingBatchController::class, 'show'])->whereNumber('id');
+    Route::put('/{id}', [\App\Http\Controllers\api\TrainingBatchController::class, 'save'])->whereNumber('id');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +62,8 @@ Route::middleware(['web', 'api'])->group(function () {
     Route::get('/course-access-options', [CourseController::class, 'accessOptions'])->middleware('session.auth');
     Route::get('/courses/{id}/access', [CourseController::class, 'access'])->middleware('session.auth');
     Route::get('/courses/{id}', [CourseController::class, 'show'])->middleware('session.auth');
+    Route::get('/courses/{id}/content-order', [CourseContentOrderController::class, 'index'])->middleware('session.auth');
+    Route::patch('/courses/{id}/content-order', [CourseContentOrderController::class, 'update'])->middleware('session.auth');
     Route::get('/courses/{id}/progress', [CourseProgressController::class, 'show'])->middleware('session.auth');
     Route::post('/courses/{id}/progress/{contentId}', [CourseProgressController::class, 'complete'])->middleware('session.auth');
     Route::post('/courses/{id}/progress/{contentId}/complete', [CourseProgressController::class, 'complete'])->middleware('session.auth');

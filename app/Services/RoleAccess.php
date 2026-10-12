@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
  */
 class RoleAccess
 {
-    public const VALID_ROLES = ['admin', 'sop', 'trainer', 'student'];
+    public const VALID_ROLES = ['admin', 'sop', 'trainer', 'audit', 'student'];
 
     public static function role(?Request $request = null): ?string
     {

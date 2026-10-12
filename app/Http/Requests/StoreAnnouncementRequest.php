@@ -28,8 +28,8 @@ class StoreAnnouncementRequest extends FormRequest
             'title' => 'required|string|max:150',
             'no_surat' => 'nullable|string|max:255',
             'type' => 'string|max:100',
-            'content' => 'nullable|string',
-            'dokumen' => 'required|file|mimes:word,pdf,xlsx|max:20480', // max 20MB
+            'content' => 'required_if:type,text|nullable|string',
+            'dokumen' => 'required_unless:type,text|nullable|file|mimes:word,pdf,xlsx,docx|max:20480', // max 20MB
             'tgl_berlaku' => 'nullable|date',
             'regionals_id' => 'required|array',
             'kd_jabatan' => 'required|array',

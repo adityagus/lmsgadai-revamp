@@ -23,6 +23,8 @@ export interface QuestionOption {
 
 export interface Question {
     id: number;
+    image_path?: string | null;
+    image_url?: string | null;
     question: string;
     type: QuestionType;
     weight: number;
@@ -82,6 +84,7 @@ export interface QuizOverride {
 
 export interface AttemptQuestion {
     id: number;
+    image_url?: string | null;
     position: number;
     question: string;
     type: QuestionType;
@@ -217,7 +220,9 @@ export interface QuizPayload extends QuizSettings {
 }
 
 export interface QuestionPayload {
+    version_if_used?: boolean;
     question: string;
+    image_path?: string | null;
     type: QuestionType;
     weight: number;
     difficulty: string;

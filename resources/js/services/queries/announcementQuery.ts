@@ -11,11 +11,19 @@ export const getAnnouncements = defineQuery<[category: Id], AnnouncementList>(
         .data,
 );
 
-export const getDetailAnnouncement = defineQuery<[id: Id], AnnouncementDetail>(
+export const getDetailAnnouncement = defineQuery<[id: Id, page?: number], AnnouncementDetail>(
     "announcements",
     "detail",
-    async ([id], signal) =>
-        (await http.get<AnnouncementDetail>(`/announcement/${id}`, { signal })).data,
+    async ([id, page], signal) =>
+        (await http.get<AnnouncementDetail>(`/announcement/${id}`, { signal, params: { page, ...(page ? { include_regions: 0 } : {}) }, timeout: 60000 })).data,
+);
+
+export const getAnnouncementRegions = defineQuery<[id: Id], Record<string, NonNullable<Announcement['document_regional']>>>(
+    'announcements',
+    'regions',
+    async ([id], signal) => (await http.get<Record<string, NonNullable<Announcement['document_regional']>>>(
+        `/announcement/${id}`, { signal, params: { regions_only: 1 }, timeout: 60000 },
+    )).data,
 );
 
 export const getDocumentById = defineQuery<[id: Id], AnnouncementResponse>(

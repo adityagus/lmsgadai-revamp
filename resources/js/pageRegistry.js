@@ -1,4 +1,6 @@
 export default {
+  'learning-history/index': () => import('./pages/learning-history/index.vue'),
+  'training-batches/index': () => import('./pages/training-batches/index.vue'),
   'landing-page/pages/home': () => import('./pages/landing-page/pages/home.vue'),
   'Admin/AuditLog': () => import('./pages/Admin/AuditLog.vue'),
   'Auth/SignIn': () => import('./pages/Auth/SignIn.vue'),

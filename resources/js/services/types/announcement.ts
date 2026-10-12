@@ -52,6 +52,7 @@ export interface AnnouncementPayload {
 
 export interface AnnouncementDetail {
     success: boolean;
+    next_page?: number | null;
     detail: {
         title: string;
         icon: string;

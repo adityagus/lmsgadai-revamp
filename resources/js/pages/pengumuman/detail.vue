@@ -67,6 +67,11 @@
     </div>
   </div>
 
+  <div v-else-if="pageError" role="alert" class="mt-6 bg-white rounded-2xl p-8 text-center border border-gray-200">
+    <p class="text-red-600">{{ pageError }}</p>
+    <button type="button" class="mt-4 px-4 py-2 bg-sidebar text-white rounded-lg" @click="loadPage">Coba lagi</button>
+  </div>
+
   <!-- Real Content when loaded -->
   <template v-else>
     <h1 class="text-xl sm:text-2xl font-bold text-sidebar mt-4 sm:mt-2 mb-3 sm:mb-4">{{ detail.name }}</h1>
@@ -79,6 +84,8 @@
       >
         <!-- START: AREA TAB STATIC -->
         <button v-for="tab in memoTabs" :key="tab.kd_wilayah" @click="activeMemoTab = tab.kd_wilayah"
+          :disabled="tab.kd_wilayah !== 'all' && (nextDocumentPage !== null || areasLoading || areasError)"
+          :title="nextDocumentPage !== null ? 'Filter tersedia setelah semua dokumen dimuat' : ''"
           :class="['px-3 py-1.5 rounded-lg font-semibold text-xs transition cursor-pointer whitespace-nowrap shrink-0', activeMemoTab === tab.kd_wilayah ? 'bg-sidebar text-white shadow' : 'bg-white text-sidebar hover:bg-purple-100']">
           <span>{{ tab.nm_wilayah || (tab.kd_wilayah === 'all' ? 'All' : tab.kd_wilayah) }}</span>
         </button>
@@ -213,8 +220,8 @@ import OpenModalPDF from '@/components/openModalPDF.vue';
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from '@/navigation'
 import Vue3Datatable from '@bhplugin/vue3-datatable';
-import { getDetailAnnouncement, getLastDocumentPreview } from '@/services/queries/announcementQuery.ts';
-import { getSession } from '@/services/queries/authQuery.ts';
+import { getDetailAnnouncement, getLastDocumentPreview, getAnnouncementRegions } from '@/services/queries/announcementQuery.ts';
+import { usePage } from '@inertiajs/vue3';
 import { getWilayah } from '@/services/queries/masterQuery.ts';
 import { recordDocumentView } from '@/services/mutations/documentViewMutation.ts';
 import Swal from 'sweetalert2';
@@ -225,11 +232,22 @@ const router = useRouter();
 const detail = ref({});
 const title = ref({})
 const icon = ref({})
-const memoTabs = ref([]);
+const memoTabs = ref([{ kd_wilayah: 'all', nm_wilayah: 'All', kd_cabang: 'All' }]);
 const activeMemoTab = ref('all')
 const modalRef = ref(null);
-const auth = ref(null);
+const page = usePage();
+const auth = computed(() => page.props.auth || null);
 const isLoading = ref(true);
+const loadError = ref('');
+const areasLoading = ref(false);
+const areasError = ref(false);
+const documentRegions = ref({});
+const nextDocumentPage = ref(null);
+const remainingLoading = ref(false);
+const remainingError = ref(false);
+const pageError = computed(() => loadError.value || (areasError.value
+  ? 'Tab wilayah gagal dimuat. Silakan coba lagi.'
+  : remainingError.value ? 'Sebagian dokumen gagal dimuat. Silakan coba lagi.' : ''));
 
 
 const cards = ref([]);
@@ -267,12 +285,13 @@ const filteredCards = computed(() => {
   const validBranchCodes = Array.isArray(selectedTab.branches) ? selectedTab.branches.map(b => String(b)) : [];
 
   return allCards.filter(card => {
+    const regions = documentRegions.value[card.id] || card.document_regional || [];
     // Documents without specific regional restriction apply to all areas
-    if (!Array.isArray(card.document_regional) || card.document_regional.length === 0) {
+    if (!Array.isArray(regions) || regions.length === 0) {
       return true;
     }
 
-    return card.document_regional.some(dr => {
+    return regions.some(dr => {
       const regId = dr.regional_id ? String(dr.regional_id).trim() : '';
       if (!regId) return true;
 
@@ -477,21 +496,29 @@ watch(showModal, (val) => {
 
 
 
-onMounted(async () => {
-  isLoading.value = true;
+async function loadAreas() {
+  if (areasLoading.value) return;
+  areasLoading.value = true;
+  areasError.value = false;
   try {
-    const [result, resultAreas, resSession] = await Promise.all([
-      getDetailAnnouncement(route.params.id),
-      getWilayah(),
-      getSession()
-    ]);
+    const [areas, regions] = await Promise.all([getWilayah(), getAnnouncementRegions(route.params.id)]);
+    documentRegions.value = regions;
+    memoTabs.value = [{ kd_wilayah: 'all', nm_wilayah: 'All', kd_cabang: 'All' }, ...areas];
+  } catch {
+    areasError.value = true;
+  } finally {
+    areasLoading.value = false;
+  }
+}
 
-    auth.value = resSession ? resSession.auth : null;
-    console.log('areas', resultAreas)
+async function loadDocuments() {
+  loadError.value = '';
+  try {
+    const result = await getDetailAnnouncement(route.params.id, 1);
+    nextDocumentPage.value = result.next_page ?? null;
     let items = [];
     if (Array.isArray(result)) {
       items = result;
-      console.log('items', items)
       detail.value = result[0] || {};
     } else {
       items = result.items || [];
@@ -520,20 +547,43 @@ onMounted(async () => {
       date: detail.value.dateLastUpdate ? detail.value.dateLastUpdate : '-',
       desc: detail.value.desc || detail.value.keterangan || detail.value.deskripsi || '',
     };
-
-    memoTabs.value = [
-      { kd_wilayah: 'all', nm_wilayah: 'All', kd_cabang: 'All' },
-      ...resultAreas,
-    ]
-    console.log("result areas", memoTabs);
-    console.log("result announcement", cards.value, detail.value);
-    console.log("detail announcement", detail.value);
+    await loadRemainingDocuments();
   } catch (error) {
-    console.error(error);
+    loadError.value = ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code)
+      ? 'Daftar dokumen terlalu lama dimuat. Silakan coba lagi.'
+      : 'Daftar dokumen gagal dimuat. Silakan coba lagi.';
+  }
+}
+
+async function loadRemainingDocuments() {
+  if (remainingLoading.value) return;
+  remainingLoading.value = true;
+  remainingError.value = false;
+  try {
+    while (nextDocumentPage.value !== null) {
+      const result = await getDetailAnnouncement(route.params.id, nextDocumentPage.value);
+      const ids = new Set(cards.value.map(item => item.id));
+      cards.value.push(...result.items.filter(item => !ids.has(item.id)));
+      nextDocumentPage.value = result.next_page ?? null;
+    }
+  } catch {
+    remainingError.value = true;
+  } finally {
+    remainingLoading.value = false;
+  }
+}
+
+async function loadPage() {
+  isLoading.value = true;
+  activeMemoTab.value = 'all';
+  try {
+    await Promise.all([loadDocuments(), loadAreas()]);
   } finally {
     isLoading.value = false;
   }
-});
+}
+
+onMounted(loadPage);
 
 
 </script>

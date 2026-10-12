@@ -37,3 +37,9 @@ test('question edits preserve type, explanations and bank without reusing answer
   assert.equal(result.bank_id,9);assert.equal(result.course_id,3);assert.equal(result.question,'Soal');assert.equal(result.explanation,'Pembahasan');
   assert.deepEqual(result.options,[{text:'A',is_correct:true},{text:'B',is_correct:true}]);
 });
+
+test('question copies preserve image paths and removal sends an explicit null', () => {
+  const source = { question: 'Lihat gambar', type: 'essay', weight: 1, options: [], image_path: 'quiz-questions/1/example.png' };
+  assert.equal(questionPayload(source, 1).image_path, source.image_path);
+  assert.equal(questionPayload({ ...source, image_path: null }, 1).image_path, null);
+});

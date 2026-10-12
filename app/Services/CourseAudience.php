@@ -45,6 +45,7 @@ class CourseAudience
         $rules = $this->read($courseId);
         if ($request->session()->get('auth.status') !== 'login') return false;
         $username = (string) $request->session()->get('auth.user', '');
+        if (app(TrainingBatchAccess::class)->courseIds($username)->contains($courseId)) return true;
         if (Schema::hasTable('course_participants') && $username !== '' && DB::table('course_participants')
             ->where('course_id', $courseId)->where('username', $username)->exists()) {
             return true;

@@ -4,15 +4,11 @@
     <div class="relative flex flex-col justify-center w-full h-screen sm:p-0 lg:flex-row">
 
 
-      <div class="relative hidden w-full h-full bg-brand-950 lg:grid lg:w-1/2 url-b">
-
-
-        <div class="flex items-center justify-center z-1">
-
-          <!-- back to landing page (coming soon) -->
-          <div class="w-full max-w-md pt-10">
+      <div class="relative hidden w-full h-full overflow-hidden bg-brand-950 lg:block lg:w-1/2">
+          <img class="absolute inset-0 h-full w-full object-cover object-[-50px_50%]"
+            src="/assets/images/backgrounds/discuss.png" alt="">
             <router-link to="/"
-              class="absolute top-4 left-4 inline-flex items-center text-sm text-white transition-colors hover:text-gray-700 z-10">
+              class="absolute top-4 left-4 z-10 inline-flex items-center rounded-lg bg-black/40 px-3 py-2 text-sm text-white transition-colors hover:bg-black/60">
               <svg class="stroke-current mr-1" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                 viewBox="0 0 20 20" fill="none">
                 <path d="M12.7083 5L7.5 10.2083L12.7083 15.4167" stroke-width="1.5" stroke-linecap="round"
@@ -20,21 +16,6 @@
               </svg>
               Back to Landing Page
             </router-link>
-          </div>
-          <!-- ===== Common Grid Shape Start ===== -->
-          <!-- <include src="./partials/common-grid-shape.html"></include> -->
-          <img class="w-full h-full object-cover relative"
-            src="https://images.unsplash.com/photo-1540563283646-b6e0f4762a5f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-            alt="">
-
-          <!-- <div class="flex flex-col items-center max-w-xs">
-            <a href="index.html" class="block mb-4">
-            </a>
-            <p class="text-center text-gray-400 dark:text-white/60">
-              Gambar
-            </p>
-          </div> -->
-        </div>
       </div>
       <!-- Toggler -->
       <div class="fixed z-50 hidden bottom-6 right-6 sm:block">
@@ -134,7 +115,7 @@
                   <!-- Button -->
                   <div>
                     <button type='submit' :disabled="form.processing"
-                      class="flex items-center justify-center w-full px-4 py-3 text-sm font-medium bg-blue-600 text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600">
+                      class="lms-primary-button flex items-center justify-center w-full px-4 py-3 text-sm font-medium rounded-lg shadow-theme-xs">
                       Sign In
                     </button>
                   </div>
@@ -161,5 +142,8 @@ const username = toRef(form, 'user');
 const password = toRef(form, 'pass');
 const showPassword = ref(false);
 const darkMode = ref(false);
-const submitLogin = () => form.post('/login', {onFinish:() => form.reset('pass')});
+const submitLogin = () => {
+  if (form.processing) return;
+  form.post('/login', {onFinish:() => form.reset('pass')});
+};
 </script>

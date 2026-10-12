@@ -6,6 +6,12 @@ import { apiInstance as http } from "../../utils/axios.ts";
 
 import { defineQuery } from "../../api/query.ts";
 
+export const getPopularCourses = defineQuery<[], { data: Array<{ id: number; name: string; description: string | null; thumbnail_url: string | null }> }>(
+    "courses",
+    "popular",
+    async ([], signal) => (await http.get("/api/popular-courses", { signal })).data,
+);
+
 export const getCourses = defineQuery<[page?: number], CourseList>(
     "courses",
     "list",

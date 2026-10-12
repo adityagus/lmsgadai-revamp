@@ -1,6 +1,6 @@
 <template>
   <!-- Top Buttons (Skeleton hanya untuk role yang dapat mengelola dokumen) -->
-  <div class="flex justify-end mb-4 gap-2 min-h-[40px]">
+  <div v-if="canManageDocuments" class="flex justify-end mb-4 gap-2 min-h-[40px]">
     <template v-if="isLoading && canManageDocuments">
       <div class="w-36 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
       <div class="w-24 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
@@ -40,6 +40,11 @@
       </div>
       <div class="w-full h-10 bg-gray-200 rounded-b-2xl"></div>
     </div>
+  </div>
+
+  <div v-else-if="loadError" role="alert" class="bg-white rounded-2xl p-8 text-center border border-gray-200 shadow-xl">
+    <p class="text-red-600">{{ loadError }}</p>
+    <button type="button" class="mt-4 px-4 py-2 bg-sidebar text-white rounded-lg" @click="loadAllData">Coba lagi</button>
   </div>
 
   <!-- Real Data Cards (Original Layout & Styling) -->
@@ -96,7 +101,6 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { getAnnouncements } from '@/services/queries/announcementQuery.ts';
 import { useRoute } from '@/navigation';
-import { getSession } from '@/services/queries/authQuery.ts';
 import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -108,6 +112,7 @@ const props = defineProps({
 
 const cards = ref([]);
 const isLoading = ref(true);
+const loadError = ref('');
 const route = useRoute();
 
 const category = computed(() => {
@@ -115,7 +120,7 @@ const category = computed(() => {
 });
 
 const page = usePage();
-const auth = ref(page.props.auth || null);
+const auth = computed(() => page.props.auth || null);
 const canManageDocuments = computed(() => {
   const user = auth.value;
   return ['admin', 'sop'].includes(user?.role);
@@ -132,17 +137,14 @@ const icons = ref([
 
 const loadAllData = async () => {
   isLoading.value = true;
+  loadError.value = '';
   try {
-    const [resAnnouncement, resSession] = await Promise.all([
-      getAnnouncements(category.value),
-      getSession()
-    ]);
+    const resAnnouncement = await getAnnouncements(category.value);
     cards.value = resAnnouncement?.data || resAnnouncement || [];
-    if (resSession) {
-      auth.value = resSession.auth;
-    }
   } catch (error) {
-    console.error('Error fetching data:', error);
+    loadError.value = ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code)
+      ? 'Daftar dokumen terlalu lama dimuat. Silakan coba lagi.'
+      : 'Daftar dokumen gagal dimuat. Silakan coba lagi.';
     cards.value = [];
   } finally {
     isLoading.value = false;

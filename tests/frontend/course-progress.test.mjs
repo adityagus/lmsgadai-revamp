@@ -42,9 +42,27 @@ test('student resumes active lesson and can reopen completed lessons without a d
   state.goToContent(0);
   assert.equal(state.currentContentIndex.value, 0);
   assert.equal(writes, 0);
+  state.goToContent(1);
+  assert.equal(state.currentContentIndex.value, 1);
   const linked = setup({ progress: resumed, query: { content: '1' } });
   await linked.fetchCourseData();
   assert.equal(linked.currentContentIndex.value, 1);
+});
+
+test('reopening a completed lesson does not unlock unfinished lessons beyond the next step', async () => {
+  const state = setup({
+    materials: [1, 2, 3, 4].map(id => ({ id, type: 'text' })),
+    progress: { items: [1, 2, 3, 4].map(id => ({ content_id: id, completed_at: [1, 4].includes(id) ? '2026-09-28T00:00:00Z' : null })) },
+  });
+  await state.fetchCourseData();
+  state.goToContent(3);
+  assert.equal(state.currentContentIndex.value, 3);
+  state.goToContent(2);
+  assert.equal(state.currentContentIndex.value, 3);
+  state.goToContent(0);
+  assert.equal(state.currentContentIndex.value, 0);
+  state.goToContent(1);
+  assert.equal(state.currentContentIndex.value, 1);
 });
 
 test('complete waits for persistence, blocks duplicate clicks, then checks and advances', async () => {

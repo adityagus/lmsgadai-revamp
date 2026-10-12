@@ -5,6 +5,7 @@ use Inertia\Inertia;
 
 Route::get('/storage/{path}', \App\Http\Controllers\StoredFileController::class)->where('path', '.*');
 require __DIR__.'/legacy.php';
+Route::get('/api/popular-courses', [\App\Http\Controllers\api\CourseController::class, 'popular']);
 Route::get('/sign-in', fn () => session('auth.user') ? redirect('/overview') : Inertia::render('Auth/SignIn', ['title' => 'Masuk', 'fullscreen' => true]))->name('login');
 Route::redirect('/lms', '/kelas');
 Route::redirect('/report', '/report/documents');
