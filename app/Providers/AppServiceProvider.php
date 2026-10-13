@@ -33,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        if (env('DOCKER_DEV', false)) {
+            \Illuminate\Support\Facades\Vite::useHotFile(storage_path('framework/vite.hot'));
+        }
         config(['app.timezone' => 'Asia/Jakarta']);
         date_default_timezone_set('Asia/Jakarta');
         \Illuminate\Support\Facades\RateLimiter::for('login', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by($request->ip().'|'.strtolower((string) $request->input('user'))));

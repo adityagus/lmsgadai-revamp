@@ -14,7 +14,13 @@ if [ -L public/storage ]; then
     unlink public/storage
 fi
 
-php artisan config:cache
-php artisan view:cache
+if [ "${DOCKER_DEV:-false}" = "true" ]; then
+    php artisan config:clear
+    php artisan route:clear
+    php artisan view:clear
+else
+    php artisan config:cache
+    php artisan view:cache
+fi
 
 exec docker-php-entrypoint "$@"

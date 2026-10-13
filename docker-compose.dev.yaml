@@ -1,0 +1,43 @@
+# Local development: docker compose -f docker-compose.dev.yaml up -d --build
+services:
+  app:
+    extends:
+      file: docker-compose.yaml
+      service: app
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DOCKER_DEV: "true"
+    volumes:
+      - .:/var/www/html
+      - dev_vendor:/var/www/html/vendor
+      - dev_bootstrap:/var/www/html/bootstrap/cache
+      - ./docker/php-dev.ini:/usr/local/etc/php/conf.d/zz-dev.ini:ro
+
+  vite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: assets
+    image: lmsgadai-revamp-vite:dev
+    restart: unless-stopped
+    working_dir: /app
+    init: true
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    environment:
+      DOCKER_DEV: "true"
+      DOCKER_VITE_PORT: "${DOCKER_VITE_PORT:-5173}"
+    ports:
+      - "127.0.0.1:${DOCKER_VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/app
+      - dev_node_modules:/app/node_modules
+      - runtime:/app/storage
+    depends_on:
+      - app
+
+volumes:
+  runtime:
+  dev_vendor:
+  dev_bootstrap:
+  dev_node_modules:

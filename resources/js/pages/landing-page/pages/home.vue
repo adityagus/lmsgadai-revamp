@@ -475,7 +475,7 @@ const testimonials = [
     },
     {
         name: "Asep",
-        quote: "Materi kursus sangat lengkap dan mudah dipahami dan dokumen nya sangat membantu!",
+        quote: "Beladiri memberikan kemudahan dalam bekerja dengan proses yang lebih cepat, praktis, dan terorganisir.",
         img: "/assets/images/testimonials/asep.png",
     },
     {

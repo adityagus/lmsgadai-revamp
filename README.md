@@ -19,6 +19,8 @@ When using Artisan's URL, set `APP_URL=http://127.0.0.1:8001` in `.env`. Open `/
 
 For development, run `npm run dev` alongside the PHP server. Laravel uses server routes and Inertia for page navigation; existing domain components retain their JSON API contracts.
 
+For Docker with live local code and Vue hot reload, run `docker compose -f docker-compose.dev.yaml up -d --build` and open http://localhost:8002. See [Docker development](docs/DOCKER.md) for dependency updates and shutdown commands.
+
 ## Shared data
 
 The same primary LMS database and PostgreSQL employee database are used by explicit request. Existing records are not reset or seeded. Do not use `migrate:fresh`, `db:wipe`, or setup scripts that run migrations against these connections.
