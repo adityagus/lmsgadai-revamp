@@ -11,8 +11,7 @@ class DocumentLifecycleTest extends TestCase
 {
     public function test_archive_and_restore_move_the_document_file_with_its_record(): void
     {
-        config(['filesystems.default' => 'local']);
-        $disk = Storage::fake('local');
+        $disk = Storage::fake('s3');
         Schema::create('documents', function ($table) {
             $table->id(); $table->string('title'); $table->string('url');
             $table->string('created_by')->nullable(); $table->string('updated_by')->nullable(); $table->string('deleted_by')->nullable();

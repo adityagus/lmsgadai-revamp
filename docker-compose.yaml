@@ -16,7 +16,6 @@ services:
       APP_KEY: "${APP_KEY:?Isi APP_KEY di .env dengan key aplikasi yang sudah ada}"
       DB_HOST: "${DOCKER_DB_HOST:-${DB_HOST:-host.docker.internal}}"
       DB2_HOST: "${DOCKER_DB2_HOST:-${DB2_HOST:-host.docker.internal}}"
-      LMS_UPLOAD_ROOT: /var/www/uploads/public
       SESSION_DRIVER: file
       CACHE_STORE: file
       LOG_CHANNEL: stderr
@@ -24,11 +23,6 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - runtime:/var/www/html/storage
-      - type: bind
-        source: ${DOCKER_UPLOAD_PATH:-../lmsgadai/storage/app}
-        target: /var/www/uploads
-        bind:
-          create_host_path: false
 
 volumes:
   runtime:

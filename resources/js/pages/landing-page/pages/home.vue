@@ -480,7 +480,7 @@ const testimonials = [
     },
     {
         name: "Nanda Jalu",
-        quote: "Dashboard dan laporan progres sangat membantu saya memantau perkembangan belajar.",
+        quote: "Beladiri sangat membantu mempermudah pekerjaan, mempercepat proses operasional, dan meningkatkan efisiensi kerja dengan sistem yang praktis dan mudah digunakan.",
         img: "/assets/images/testimonials/nanda.png",
     },
 ];

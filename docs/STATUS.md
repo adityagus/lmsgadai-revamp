@@ -1,5 +1,19 @@
 # Revamp status
 
+MinIO-only uploads (2026-10-13):
+- Removed local upload disks, environment switches/root paths (including local .env), optional Compose bind override, symlink creation, and local-copy/comparison tooling. Updated README and Docker/MinIO instructions. Runtime sessions/cache/logs remain local; existing upload files and bucket contents were not deleted or migrated.
+- Renamed upload implementation to MinioFileUploadService, preserving object paths with configured/empty prefixes for archive, restore and delete. Removed Laravel's merged built-in local disk before filesystem boot so its default /storage routes cannot override MinIO streaming. Public thumbnail image access retained while private documents require login.
+- Verified 12 focused tests / 106 assertions using SQLite memory and fake storage: configuration/service binding, upload/archive/restore/delete, private streaming, guest denial, public thumbnails, course/document creation and quiz images. Default/shared Compose validation, PHP syntax and focused whitespace checks passed. Repaired stale Composer autoload from prior Algolia removal using non-optimized generation; config cache cleared. No Docker rebuild, remote deployment, or live MinIO writes performed.
+
+MinIO Docker mount correction (2026-10-13):
+- User confirmed current storage is MinIO. Main Compose now explicitly selects s3 and removes the mandatory legacy upload bind that blocked server startup when /opt/docker/lmsgadai/storage/app did not exist. Optional docker-compose.local-uploads.yaml restores local storage and the existing-folder bind for legacy filesystem deployments. Updated docs/DOCKER.md.
+- Default, shared-network and local-upload Compose configuration validation passed. Parsed configuration confirms s3 without bind mounts by default and local storage with the guarded upload bind in the override; focused whitespace check passed. Remote deployment and live MinIO access not tested; no database or bucket changes.
+
+Unused search/editor dependencies (2026-10-13):
+- Removed unused vue-instantsearch and ckeditor5 v42 plus their orphaned npm dependencies; retained the Classic v41 editor and Vue adapter imported by course-content and announcement editors. Updated npm manifest/lock.
+- Removed unused Algolia PHP client, service/interface, and container binding; active search continues through existing CourseService database queries. Updated Composer manifest/lock without other PHP package version changes.
+- Production Vite build and Composer manifest validation passed; existing large-chunk warning remains. Docker build not rerun. Composer optimized-autoload generation stalled in the restricted environment; regeneration and Laravel page checks are pending.
+
 Docker runtime repair (2026-10-13):
 - Replaced the incomplete CLI image/startup with PHP 8.3 Apache, the existing public-root Apache config and entrypoint, required MySQL/PostgreSQL/cURL/GD/ZIP extensions, and a separate Node 22 Vite build stage. Runtime directories are created before Composer discovery; Windows entrypoint line endings are normalized.
 - Compose loads runtime settings for both databases, email and MinIO from .env, persists session/cache storage, mounts legacy uploads, and defaults to localhost:8002. Removed automatic migrations and the mandatory nonexistent staging_shared_network; optional shared-network override supports shared_db_network. Updated docs/DOCKER.md.

@@ -193,7 +193,7 @@
     <!-- Modal Document Detail pakai komponen openModalPdf -->
     <openModalPdf ref="modalRef" :cards="[selectedDocument]" v-model:showModal="showModal"
       v-model:selectedCard="selectedDocument" @close="closeModal" />
-    <!-- End: Modal Search Algolia Style -->
+    <!-- End: Modal Search -->
 
     <div class="relative flex items-center justify-end gap-2 sm:gap-[14px] shrink-0 group">
       <div class="text-right hidden sm:block">

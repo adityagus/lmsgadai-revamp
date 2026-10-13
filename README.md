@@ -12,7 +12,6 @@ On the current Windows installation, `scripts\serve.cmd` starts the application 
 composer install
 npm install
 npm run build
-php artisan storage:link
 php artisan serve --port=8001
 ```
 
@@ -24,7 +23,7 @@ For development, run `npm run dev` alongside the PHP server. Laravel uses server
 
 The same primary LMS database and PostgreSQL employee database are used by explicit request. Existing records are not reset or seeded. Do not use `migrate:fresh`, `db:wipe`, or setup scripts that run migrations against these connections.
 
-Uploads use `LMS_UPLOAD_ROOT` (locally, the original app's `storage/app/public`) so both applications can access the same files. Consequently, changes made through either application's forms affect the shared data. The revamp's sessions, cache, views, and logs remain separate.
+Uploads use the private MinIO bucket configured in `.env`; see [MinIO setup](docs/MINIO.md). The revamp does not use a local upload folder or storage symlink. Existing database file paths and browser URLs are preserved. The revamp's sessions, cache, views, and logs remain local and separate.
 
 ## Feature map
 

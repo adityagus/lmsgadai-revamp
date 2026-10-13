@@ -156,11 +156,8 @@ class QuizTest extends TestCase
         $uploaded = $this->post('/api/quiz/question-images', ['image' => $file()], ['Accept' => 'application/json'])->assertOk()->json();
         \Illuminate\Support\Facades\Storage::disk('public')->assertExists($uploaded['image_path']);
         $this->assertStringStartsWith('/api/quiz/question-images/', $uploaded['image_url']);
-        foreach (['local', 's3'] as $driver) {
-            config(['filesystems.lms_storage_driver' => $driver]);
-            $this->get($uploaded['image_url'])->assertOk()->assertStreamedContent($png)
-                ->assertHeader('Content-Type', 'image/png')->assertHeader('X-Content-Type-Options', 'nosniff');
-        }
+        $this->get($uploaded['image_url'])->assertOk()->assertStreamedContent($png)
+            ->assertHeader('Content-Type', 'image/png')->assertHeader('X-Content-Type-Options', 'nosniff');
         $this->withSession(['auth' => []])->getJson($uploaded['image_url'])->assertUnauthorized();
         $this->loginAs('budi');
         $this->get($uploaded['image_url'])->assertOk()->assertStreamedContent($png);

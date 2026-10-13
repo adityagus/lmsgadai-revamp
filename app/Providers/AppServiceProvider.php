@@ -13,8 +13,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->bind(\App\Contracts\SearchServiceInterface::class, \App\Services\AlgoliaService::class);
-        $this->app->bind(\App\Contracts\FileUploadServiceInterface::class, \App\Services\LocalFileUploadService::class);
+        // Laravel merges its built-in local disk into application configuration.
+        // Remove it before filesystem boot registers local /storage routes.
+        $disks = config('filesystems.disks');
+        unset($disks['local']);
+        config(['filesystems.disks' => $disks]);
+
+        $this->app->bind(\App\Contracts\FileUploadServiceInterface::class, \App\Services\MinioFileUploadService::class);
         $this->app->bind(\App\Contracts\Repositories\MasterRepositoryInterface::class, \App\Repositories\MasterRepository::class);
         $this->app->bind(\App\Contracts\Repositories\UserRepositoryInterface::class, \App\Repositories\UserRepository::class);
         $this->app->bind(\App\Contracts\Repositories\DocumentViewRepositoryInterface::class, \App\Repositories\DocumentViewRepository::class);

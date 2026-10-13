@@ -28,6 +28,9 @@ class LmsAuthorization
             return $next($request);
         }
         // Keep the existing public course-detail page and its preview contract.
+        if ($request->isMethod('GET') && preg_match('~^storage/aktif/uploads/courses/[^/]+\.(?:png|jpe?g|gif|webp|avif)$~i', $request->path())) {
+            return $next($request);
+        }
         if ($request->isMethod('GET') && $request->is('api/preview-course/*', 'api/v1/preview-course/*')) {
             return $next($request);
         }

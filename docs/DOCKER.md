@@ -13,12 +13,11 @@ DOCKER_APP_PORT=8002
 DOCKER_APP_URL=http://localhost:8002
 DOCKER_DB_HOST=host.docker.internal
 DOCKER_DB2_HOST=host.docker.internal
-DOCKER_UPLOAD_PATH=C:/laragon/www/lmsgadai/storage/app
 ```
 
 Untuk database remote, Compose menggunakan `DB_HOST`/`DB2_HOST` yang ada; jangan tambahkan override host tersebut. `127.0.0.1` di container menunjuk ke container sendiri. Database host harus menerima koneksi dari Docker. Port, nama database, dan kredensial tetap berasal dari `.env`. Jika email memakai SMTP di host, sesuaikan `MAIL_HOST` ke `host.docker.internal`.
 
-`DOCKER_UPLOAD_PATH` harus menunjuk ke folder **storage/app**, yang berisi folder `public`, agar upload aktif dan arsip tetap memakai lokasi legacy. Folder harus sudah ada dan dapat ditulis oleh container (www-data/UID 33 pada Linux). Startup tidak mengubah kepemilikan folder legacy. `.env` dan upload tidak disalin ke image.
+Upload hanya menggunakan MinIO, tanpa bind mount upload legacy. Isi `AWS_ENDPOINT` (endpoint API S3, bukan console), `AWS_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, dan `AWS_USE_PATH_STYLE_ENDPOINT=true` di `.env`. Alias `MINIO_*` yang didukung aplikasi juga dapat digunakan. Endpoint harus dapat dijangkau dari container; gunakan override jaringan bersama di bawah bila diperlukan. `.env` dan upload tidak disalin ke image.
 
 ## Jalankan
 
@@ -42,7 +41,7 @@ Gunakan kedua argumen `-f` tersebut juga untuk perintah `config`, `logs`, dan `d
 docker compose down
 ```
 
-Session/cache disimpan dalam named volume `runtime`; upload tetap di folder legacy. Compose tidak membuat database, menjalankan migrasi, reset, seed, scheduler, atau worker. Perintah email tetap dijalankan manual bila dibutuhkan.
+Session/cache disimpan dalam named volume `runtime`; seluruh upload memakai MinIO. Compose tidak membuat database, menjalankan migrasi, reset, seed, scheduler, atau worker. Perintah email tetap dijalankan manual bila dibutuhkan.
 
 Validasi konfigurasi dengan `--quiet` agar nilai kredensial tidak dicetak. Setelah perubahan kode/dependency, jalankan kembali `docker compose up -d --build`.
 

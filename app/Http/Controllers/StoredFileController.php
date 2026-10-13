@@ -8,7 +8,6 @@ class StoredFileController extends Controller
 {
     public function __invoke(string $path)
     {
-        abort_unless(config('filesystems.lms_storage_driver') === 's3', 404);
         abort_if(str_contains($path, '\\') || str_contains($path, "\0") ||
             in_array('..', explode('/', $path), true), 404);
 

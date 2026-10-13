@@ -6,7 +6,7 @@ use App\Contracts\FileUploadServiceInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-class LocalFileUploadService implements FileUploadServiceInterface
+class MinioFileUploadService implements FileUploadServiceInterface
 {
     /**
      * @inheritDoc
@@ -14,8 +14,8 @@ class LocalFileUploadService implements FileUploadServiceInterface
     public function upload(UploadedFile $file, string $directory, string $fileName = null): string
     {
         $fileName = $fileName ?? (time() . '_' . $file->getClientOriginalName());
-        
-        // Store in the 'aktif' disk (mapped to storage/app/public/aktif)
+
+        // Store under the configured MinIO active-document prefix.
         return $file->storeAs($directory, $fileName, 'aktif');
     }
 
@@ -27,12 +27,13 @@ class LocalFileUploadService implements FileUploadServiceInterface
         if (Storage::disk($disk)->exists($path)) {
             return Storage::disk($disk)->delete($path);
         }
-        
-        // Fallback to default disk if path contains 'public/' prefix
+
+        // Existing database paths use public/ even when the bucket prefix is empty.
+        $path = $this->objectPath($path);
         if (Storage::exists($path)) {
             return Storage::delete($path);
         }
-        
+
         return false;
     }
 
@@ -41,15 +42,21 @@ class LocalFileUploadService implements FileUploadServiceInterface
      */
     public function move(string $from, string $to): bool
     {
+        $from = $this->objectPath($from);
+        $to = $this->objectPath($to);
         // Support moving files (e.g., from aktif to tidakaktif folders)
         if (Storage::exists($from)) {
-            // Ensure destination folder exists
-            $dir = dirname($to);
-            if (!Storage::exists($dir)) {
-                Storage::makeDirectory($dir);
-            }
             return Storage::move($from, $to);
         }
         return false;
+    }
+
+    private function objectPath(string $path): string
+    {
+        if (str_starts_with($path, 'public/')) {
+            return ltrim(config('filesystems.minio_public_prefix', 'public').'/'.substr($path, 7), '/');
+        }
+
+        return $path;
     }
 }
