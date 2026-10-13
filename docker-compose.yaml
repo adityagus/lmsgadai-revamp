@@ -5,33 +5,30 @@ services:
       dockerfile: Dockerfile
     image: lmsgadai-revamp:latest
     restart: unless-stopped
-
     ports:
-      - "${APP_PORT:-8002}:8000"
-
-    networks:
-      - staging_network
-
+      - "127.0.0.1:${DOCKER_APP_PORT:-${APP_PORT:-8002}}:80"
+    env_file:
+      - .env
     environment:
       APP_ENV: production
-      APP_DEBUG: "${APP_DEBUG:-false}"
-      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "${DOCKER_APP_DEBUG:-false}"
+      APP_URL: "${DOCKER_APP_URL:-http://localhost:8002}"
+      APP_KEY: "${APP_KEY:?Isi APP_KEY di .env dengan key aplikasi yang sudah ada}"
+      DB_HOST: "${DOCKER_DB_HOST:-${DB_HOST:-host.docker.internal}}"
+      DB2_HOST: "${DOCKER_DB2_HOST:-${DB2_HOST:-host.docker.internal}}"
+      LMS_UPLOAD_ROOT: /var/www/uploads/public
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      LOG_CHANNEL: stderr
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - runtime:/var/www/html/storage
+      - type: bind
+        source: ${DOCKER_UPLOAD_PATH:-../lmsgadai/storage/app}
+        target: /var/www/uploads
+        bind:
+          create_host_path: false
 
-      DB_CONNECTION: mysql
-      DB_HOST: "${DB_HOST}"
-      DB_PORT: "${DB_PORT:-3306}"
-      DB_DATABASE: "${DB_DATABASE}"
-      DB_USERNAME: "${DB_USERNAME}"
-      DB_PASSWORD: "${DB_PASSWORD}"
-
-    command: >-
-      sh -c "php artisan migrate --force
-      && php artisan config:cache
-      && php artisan route:cache
-      && php artisan view:cache
-      && php artisan serve --host=0.0.0.0 --port=8000"
-
-networks:
-  staging_network:
-    external: true
-    name: staging_shared_network
+volumes:
+  runtime:

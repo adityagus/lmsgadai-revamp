@@ -7,7 +7,7 @@ if [ -z "${APP_KEY:-}" ]; then
 fi
 
 mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs
-chown -R www-data:www-data storage/framework bootstrap/cache
+chown -R www-data:www-data storage/framework storage/logs bootstrap/cache
 
 # Existing local files must not bypass the MinIO route after switching storage.
 if [ "${LMS_STORAGE_DRIVER:-local}" = "s3" ]; then
@@ -17,5 +17,8 @@ if [ "${LMS_STORAGE_DRIVER:-local}" = "s3" ]; then
 elif [ ! -e public/storage ]; then
     ln -s /var/www/uploads/public public/storage
 fi
+
+php artisan config:cache
+php artisan view:cache
 
 exec docker-php-entrypoint "$@"

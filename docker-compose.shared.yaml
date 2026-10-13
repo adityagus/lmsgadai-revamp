@@ -1,0 +1,9 @@
+# Use when DB_HOST/DB2_HOST/AWS_ENDPOINT refer to sibling containers.
+services:
+  app:
+    networks:
+      - shared
+networks:
+  shared:
+    external: true
+    name: ${DOCKER_NETWORK:-shared_db_network}
