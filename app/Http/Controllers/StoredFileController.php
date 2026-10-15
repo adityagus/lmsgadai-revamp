@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class StoredFileController extends Controller
 {
-    public function __invoke(string $path)
+    public function __invoke(Request $request, string $path)
     {
         abort_if(str_contains($path, '\\') || str_contains($path, "\0") ||
             in_array('..', explode('/', $path), true), 404);
@@ -18,6 +19,6 @@ class StoredFileController extends Controller
         return $disk->response($path, null, [
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',
-        ]);
+        ], $request->boolean('download') ? 'attachment' : 'inline');
     }
 }

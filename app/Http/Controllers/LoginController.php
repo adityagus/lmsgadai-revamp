@@ -54,7 +54,6 @@ class LoginController extends Controller
             if ($passwordMatches || $localBypass) {
 
                 $nama = $user->full_name ?? '';
-
                 $datasession = [
                     'nama' => Str::title($nama),
                     'user' => $user->username,
@@ -65,7 +64,7 @@ class LoginController extends Controller
                     'npk' => $user->npk ?? null,
                     'status' => 'login'
                 ];
-
+                
                 $request->session()->migrate(true);
                 $request->session()->put('auth', $datasession);
 

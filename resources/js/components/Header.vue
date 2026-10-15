@@ -345,10 +345,8 @@ function gotoDetail(course) {
 }
 
 function openDocumentDetail(document) {
-  console.log('openDocumentDetail', document);
-  selectedDocument.value = document;
   selectedCourse.value = null;
-  showModal.value = true;
+  modalRef.value?.openModal(document);
 
   closeSearch();
 }

@@ -59,6 +59,8 @@ import { ref, computed, onMounted, defineExpose } from 'vue';
 import ContentPdf from '@/pages/course-preview/ContentPdf.vue';
 import ContentText from '@/pages/course-preview/ContentText.vue';
 import { getSession } from '@/services/queries/authQuery.ts';
+import { formDownloadUrl, downloadForm } from '@/utils/formDownload.js';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
   // cards: Array,
@@ -99,6 +101,13 @@ function closeModal() {
 }
 
 function openModal(card) {
+  const downloadUrl = formDownloadUrl(card);
+  if (downloadUrl !== null) {
+    closeModal();
+    if (downloadUrl) downloadForm(downloadUrl);
+    else Swal.fire({ icon: 'error', title: 'File formulir tidak tersedia', text: 'Hubungi pengelola dokumen untuk melengkapi file.' });
+    return;
+  }
   emit('update:showModal', true);
   emit('update:selectedCard', card);
 }

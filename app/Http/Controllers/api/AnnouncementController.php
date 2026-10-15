@@ -258,7 +258,8 @@ class AnnouncementController extends Controller
             $announcementArr = [
                 'id' => $resource->id,
                 'title' => $resource->title,
-                'url' => $resource->content_url,
+                'url' => $announcement->url,
+                'menu' => ['id_menu' => $announcement->menu?->id_menu],
                 'no_surat' => $resource->no_surat,
                 'tgl_berlaku' => $resource->tgl_berlaku,
                 'type' => $resource->type,

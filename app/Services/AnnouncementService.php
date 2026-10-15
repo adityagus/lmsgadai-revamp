@@ -66,7 +66,7 @@ class AnnouncementService
     {
         $announcementTitle = Menu::select('id', 'name', 'icon')->findOrFail($menu_id);
         // dd($announcementTitle);
-        $query = Announcement::with('menu:id')
+        $query = Announcement::with('menu:id,id_menu')
             ->where('submenu_id', $menu_id)
             ->orderBy('tgl_berlaku', 'desc')
             ->orderBy('id', 'desc');

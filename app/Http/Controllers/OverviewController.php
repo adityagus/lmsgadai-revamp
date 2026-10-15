@@ -76,6 +76,7 @@ class OverviewController extends Controller
                 'uploader_name' => $uploaderNames[$doc->created_by] ?? $doc->created_by ?? 'System',
                 'menu' => $doc->menu ? [
                     'id' => $doc->menu->id,
+                    'id_menu' => $doc->menu->id_menu,
                     'name' => $doc->menu->name,
                 ] : null,
             ];

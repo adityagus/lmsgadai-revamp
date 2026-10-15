@@ -54,7 +54,7 @@ class MinioFileUploadService implements FileUploadServiceInterface
     private function objectPath(string $path): string
     {
         if (str_starts_with($path, 'public/')) {
-            return ltrim(config('filesystems.minio_public_prefix', 'public').'/'.substr($path, 7), '/');
+            return ltrim(config('filesystems.minio_public_prefix', '').'/'.substr($path, 7), '/');
         }
 
         return $path;
