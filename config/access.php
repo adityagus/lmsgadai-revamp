@@ -11,6 +11,7 @@ return [
         'JBT-SOP' => 'sop',
         'JBT-019' => 'trainer',
         'JBT-020' => 'audit',
+        'JBT-047' => 'admin',
         '042' => 'trainer',
         'JBT-TRAINER' => 'trainer',
     ],
