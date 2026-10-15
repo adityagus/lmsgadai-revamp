@@ -12,7 +12,7 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "${DOCKER_APP_DEBUG:-false}"
-      APP_URL: "${DOCKER_APP_URL:-http://localhost:8002}"
+      APP_URL: "${APP_URL:-https://beladiri.gadaimulia.com}"
       APP_KEY: "${APP_KEY:?Isi APP_KEY di .env dengan key aplikasi yang sudah ada}"
       DB_HOST: "${DOCKER_DB_HOST:-${DB_HOST:-host.docker.internal}}"
       DB2_HOST: "${DOCKER_DB2_HOST:-${DB2_HOST:-host.docker.internal}}"
@@ -26,3 +26,4 @@ services:
 
 volumes:
   runtime:
+

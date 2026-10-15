@@ -58,13 +58,16 @@ class DocumentViewRepository implements DocumentViewRepositoryInterface
      */
     public function getUsersWhoHaveNotViewed(int $documentId): Collection
     {
-        // 1. Ambil semua user aktif dari database eksternal (db2) dengan cache 30 menit (1800 detik)
-        $allUsers = Cache::remember('db2_active_users', 1800, function () {
+        // Cache only primitive arrays: Laravel rejects cached Collection/stdClass objects.
+        // Versioned keys bypass object values written by the legacy implementation.
+        $allUsers = Cache::remember('db2_active_users_array_v1', 1800, function () {
             return DB::connection('db2')
                 ->table('auth.users as a')
                 ->select('a.username', 'a.full_name')
                 ->where('a.is_active', '=', true)
-                ->get();
+                ->get()
+                ->map(fn ($user) => (array) $user)
+                ->all();
         });
 
         // 2. Ambil username yang sudah melihat dokumen Y
@@ -73,8 +76,8 @@ class DocumentViewRepository implements DocumentViewRepositoryInterface
             ->toArray();
 
         // 3. Filter user yang BELUM melihat dokumen Y
-        return $allUsers->reject(function ($user) use ($viewedUsernames) {
-            return in_array($user->username, $viewedUsernames);
+        return collect($allUsers)->reject(function ($user) use ($viewedUsernames) {
+            return in_array($user['username'], $viewedUsernames);
         })->values();
     }
 
@@ -90,17 +93,18 @@ class DocumentViewRepository implements DocumentViewRepositoryInterface
         }
 
         // 2. Gunakan cache mapping username -> full_name dari db2 (30 menit)
-        $userMap = Cache::remember('db2_user_fullname_map', 1800, function () {
+        $userMap = Cache::remember('db2_user_fullname_map_array_v1', 1800, function () {
             return DB::connection('db2')
                 ->table('auth.users as a')
-                ->pluck('a.full_name', 'a.username');
+                ->pluck('a.full_name', 'a.username')
+                ->all();
         });
 
         // 3. Gabungkan info tracking view (first_viewed_at, last_viewed_at, view_count)
         return $views->map(function ($view) use ($userMap) {
             $user = new \stdClass();
             $user->username = $view->username;
-            $user->full_name = $userMap->get($view->username, $view->username);
+            $user->full_name = $userMap[$view->username] ?? $view->username;
             $user->first_viewed_at = $view->first_viewed_at ? $view->first_viewed_at->toDateTimeString() : null;
             $user->last_viewed_at = $view->last_viewed_at ? $view->last_viewed_at->toDateTimeString() : null;
             $user->view_count = $view->view_count;
