@@ -35,7 +35,6 @@
                     class="flex flex-col w-full h-fit px-[30px] pt-4 pb-[30px] gap-10 z-10"
                 >
                     <ul
-                        v-if="auth?.role !== 'audit'"
                         class="flex flex-col gap-1"
                     >
                         <p

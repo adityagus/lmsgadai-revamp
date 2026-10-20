@@ -68,7 +68,7 @@ class LoginController extends Controller
                 $request->session()->migrate(true);
                 $request->session()->put('auth', $datasession);
 
-                $redirectUrl = app(LmsAccess::class)->role($request) === 'audit' ? '/report/documents' : '/overview';
+                $redirectUrl = '/overview';
                 if ($request->header('X-Inertia')) return redirect($redirectUrl);
                 return response()->json([
                     'success' => true,
