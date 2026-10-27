@@ -27,6 +27,7 @@ return [
     ['detail-pengumuman/{id}', 'detail-pengumuman', 'pengumuman/detail', 'Dokumen', null, false],
     ['archive-pengumuman', 'archive-pengumuman', 'pengumuman/archive', 'Arsip pengumuman', 'sop', false],
     ['master/categories', 'categories', 'master/category', 'Kategori kelas', null, false],
+    ['master/roles', 'masterRoles', 'master/role-management', 'Manajemen Role', 'admin', false],
     ['master/audit-logs', 'audit-logs', 'Admin/AuditLog', 'Aktivitas dokumen', 'report', false],
     ['report/documents', 'report-documents', 'report/DocumentReport', 'Laporan dokumen', 'report', false],
     ['detail-course/{id}', 'detailPage', 'landing-page/pages/detail', 'Detail kelas', null, true],

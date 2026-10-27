@@ -62,4 +62,39 @@ class EmployeeDirectory
         // Multiple accounts or overlapping position/individual access still represent one employee.
         return $query->distinct()->count('employee.employee_id');
     }
+
+    public function directory(?string $search = null, int $limit = 500)
+    {
+        try {
+            $query = DB::connection('db2')->table('auth.users as users')
+                ->leftJoin('master.employee as employee', 'employee.employee_id', '=', 'users.employee_id')
+                ->leftJoin('master.position as position', 'position.position_id', '=', 'employee.position_id')
+                ->where('users.is_active', true);
+
+            if ($search !== null && trim($search) !== '') {
+                $term = '%'.mb_strtolower(trim($search)).'%';
+                $query->where(function ($q) use ($term) {
+                    $q->whereRaw('LOWER(users.username) LIKE ?', [$term])
+                      ->orWhereRaw('LOWER(users.full_name) LIKE ?', [$term]);
+                });
+            }
+
+            return $query->orderBy('users.full_name')
+                ->limit($limit)
+                ->get([
+                    'users.username',
+                    'users.full_name as name',
+                    'employee.employee_code as npk',
+                    'position.position_name',
+                    'position.position_code',
+                ])
+                ->map(function ($row) {
+                    $pos = trim(($row->position_name ?? '') . (!empty($row->position_code) ? ' (' . $row->position_code . ')' : ''));
+                    $row->position = !empty($pos) ? $pos : ($row->position_code ?? 'Staff');
+                    return $row;
+                });
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
 }

@@ -34,9 +34,7 @@
                 <nav
                     class="flex flex-col w-full h-fit px-[30px] pt-4 pb-[30px] gap-10 z-10"
                 >
-                    <ul
-                        class="flex flex-col gap-1"
-                    >
+                    <ul class="flex flex-col gap-1">
                         <p
                             class="font-semibold text-xs leading-[18px] text-white"
                         >
@@ -184,7 +182,7 @@
                     <!-- IT SPV,  -->
                     <ul
                         class="flex flex-col gap-4"
-                        v-if="auth.role == 'admin' || auth.role == 'trainer'"
+                        v-if="hasAuthRole('admin') || hasAuthRole('trainer')"
                     >
                         <p
                             class="font-semibold text-xs leading-[18px] text-white"
@@ -219,6 +217,29 @@
                                     class="font-semibold text-white group-hover:text-[#7F33FF] transition"
                                 >
                                     Kategori
+                                </span>
+                            </div>
+                        </li>
+                        <li
+                            v-if="isAdmin"
+                            :class="{
+                                active: $route.path === '/master/roles',
+                            }"
+                            class="transition-all duration-200"
+                        >
+                            <div
+                                @click="handleMainMenuClick('/master/roles')"
+                                class="flex items-center gap-3 w-full py-3 px-5 rounded-lg transition-all duration-200 hover:bg-[#7F33FF33] cursor-pointer group"
+                            >
+                                <img
+                                    src="/assets/images/icons/security-card-white.svg"
+                                    class="w-6 h-6"
+                                    alt="icon"
+                                />
+                                <span
+                                    class="font-semibold text-white group-hover:text-[#7F33FF] transition"
+                                >
+                                    Manajemen Role
                                 </span>
                             </div>
                         </li>
@@ -258,7 +279,7 @@
                                 "
                                 class="flex items-center gap-3 py-3 px-5 rounded-lg text-white font-semibold hover:bg-[#7F33FF33]"
                                 @click="$emit('closeSidebar')"
-                                >
+                            >
                                 <img
                                     src="/assets/images/icons/quiz-history.svg"
                                     class="w-6 h-6"
@@ -293,15 +314,10 @@
                         class="flex flex-col gap-4"
                         v-if="
                             auth &&
-                            (auth.role === 'admin' ||
-                                auth.role === 'sop' ||
-                                auth.role === 'audit' ||
-                                auth.role === 'trainer' ||
-                                auth.idgrup === 'JBT-032' ||
-                                auth.idgrup === 'JBT-037' ||
-                                auth.idgrup === 'JBT-019' ||
-                                auth.idgrup === 'JBT-020' ||
-                                auth.idgrup === '042')
+                            (hasAuthRole('admin') ||
+                                hasAuthRole('sop') ||
+                                hasAuthRole('audit') ||
+                                hasAuthRole('trainer'))
                         "
                     >
                         <p
@@ -385,10 +401,29 @@ const openMenu = ref("");
 const activeSub = ref(route.path);
 const page = usePage();
 const auth = ref(page.props.auth || null);
+
+const authRoles = computed(() => {
+    const r = auth.value?.roles;
+    if (Array.isArray(r) && r.length > 0)
+        return r.map((s) => String(s).toLowerCase());
+    return [String(auth.value?.role || "student").toLowerCase()];
+});
+
+const hasAuthRole = (roleToCheck) => {
+    return authRoles.value.includes(String(roleToCheck).toLowerCase());
+};
+
 const quizManager = computed(
     () =>
-        ["admin", "trainer", "teacher"].includes(auth.value?.role) ||
+        hasAuthRole("admin") ||
+        hasAuthRole("trainer") ||
+        hasAuthRole("teacher") ||
         ["JBT-032", "JBT-038", "JBT-019", "042"].includes(auth.value?.idgrup),
+);
+const isAdmin = computed(
+    () =>
+        hasAuthRole("admin") ||
+        ["JBT-032", "JBT-047"].includes(auth.value?.idgrup),
 );
 const isMobile = ref(window.innerWidth < 768);
 

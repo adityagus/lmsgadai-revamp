@@ -186,7 +186,7 @@ class PositionAuthorizationTest extends TestCase
         });
         $this->loginAs('JBT-020', 'admin');
         $this->getJson('/session')->assertJsonPath('auth.role', 'audit');
-        $this->get('/overview')->assertRedirect('/report/documents');
+        $this->get('/overview')->assertOk();
         $this->get('/report')->assertRedirect('/report/documents');
         foreach (['/report/documents', '/master/audit-logs', '/api/v1/report/documents', '/api/v1/report/activity-logs'] as $path) {
             $this->get($path)->assertOk();
@@ -200,17 +200,22 @@ class PositionAuthorizationTest extends TestCase
             $this->postJson($prefix.'/announcements/1', [])->assertForbidden();
             $this->patchJson($prefix.'/announcements/1/restore')->assertForbidden();
             $this->deleteJson($prefix.'/announcements/1')->assertForbidden();
-            $this->postJson($prefix.'/document-views', ['document_id' => 1])->assertForbidden();
         }
-        foreach (['/kelas', '/student/kelas', '/quiz/manage', '/batch-pelatihan', '/riwayat-belajar', '/pengumuman', '/formulir', '/information-document/create', '/information-document/update/1', '/archive-pengumuman', '/detail-course/1', '/api/preview-course/1', '/api/v1/preview-course/1', '/api/courses', '/menu2'] as $path) {
+        // Student pages and data reads are accessible
+        foreach (['/student/kelas', '/pengumuman', '/formulir', '/riwayat-belajar', '/api/courses'] as $path) {
+            $this->get($path)->assertOk();
+        }
+        // Manager and creation/editing pages remain forbidden
+        foreach (['/kelas', '/courses/create', '/quiz/manage', '/information-document/create', '/information-document/update/1', '/archive-pengumuman'] as $path) {
             $this->get($path)->assertForbidden();
         }
+        $this->postJson('/api/courses', ['name' => 'Forbidden Course'])->assertForbidden();
         $this->postJson('/api/v1/report/documents/export-excel', [])->assertForbidden();
         $this->postJson('/api/v1/report/activity-logs/export-excel', [])->assertForbidden();
         $this->post('/logout')->assertRedirect('/sign-in')->assertSessionMissing('auth');
     }
 
-    public function test_audit_login_redirects_to_reports_after_password_verification(): void
+    public function test_audit_login_redirects_to_overview_after_password_verification(): void
     {
         $this->mock(UserRepositoryInterface::class, fn ($mock) => $mock->shouldReceive('cekLogin')->twice()->andReturn(collect([
             (object) ['username' => 'fixture', 'full_name' => 'Audit Staff', 'password_hash' => password_hash('correct password', PASSWORD_BCRYPT, ['cost' => 4]), 'position_code' => 'JBT-020'],
@@ -218,7 +223,7 @@ class PositionAuthorizationTest extends TestCase
         $this->postJson('/login', ['user' => 'fixture', 'pass' => 'wrong'])->assertJsonPath('success', false)->assertSessionMissing('auth');
         $previousSession = session()->getId();
         $this->postJson('/login', ['user' => 'fixture', 'pass' => 'correct password'])
-            ->assertJsonPath('redirect', '/report/documents')->assertSessionHas('auth.idgrup', 'JBT-020');
+            ->assertJsonPath('redirect', '/overview')->assertSessionHas('auth.idgrup', 'JBT-020');
         $this->assertNotSame($previousSession, session()->getId());
     }
 

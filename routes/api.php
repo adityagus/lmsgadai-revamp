@@ -1,33 +1,38 @@
 <?php
 
+use App\Http\Controllers\api\AnnouncementController;
+use App\Http\Controllers\api\ContentController;
+use App\Http\Controllers\api\CourseContentOrderController;
+use App\Http\Controllers\api\CourseController;
+use App\Http\Controllers\api\CourseParticipantController;
+use App\Http\Controllers\api\CourseProgressController;
+use App\Http\Controllers\api\DocumentReportController;
+use App\Http\Controllers\api\DocumentViewController;
+use App\Http\Controllers\api\FileUploadController;
+use App\Http\Controllers\api\LearningHistoryController;
+use App\Http\Controllers\api\MasterController;
+use App\Http\Controllers\api\PositionRoleController;
+use App\Http\Controllers\api\TrainingBatchController;
+use App\Http\Controllers\api\WizardController;
+use App\Http\Controllers\InformationController;
+use App\Http\Controllers\LoginController;
 use App\Http\Controllers\MigrasiDataController;
+use App\Services\RoleAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\LoginController;
-use App\Http\Controllers\api\CourseController;
-use App\Http\Controllers\api\CourseProgressController;
-use App\Http\Controllers\api\CourseParticipantController;
-use App\Http\Controllers\api\CourseContentOrderController;
-use App\Http\Controllers\api\MasterController;
-use App\Http\Controllers\api\WizardController;
-use App\Http\Controllers\api\ContentController;
-use App\Http\Controllers\InformationController;
-use App\Http\Controllers\api\FileUploadController;
-use App\Http\Controllers\api\AnnouncementController;
-use App\Http\Controllers\api\DocumentViewController;
 
 Route::middleware('session.auth')->group(function () {
-    Route::get('/learning-history', [\App\Http\Controllers\api\LearningHistoryController::class, 'index']);
-    Route::get('/learning-history/{id}', [\App\Http\Controllers\api\LearningHistoryController::class, 'show'])->whereNumber('id');
+    Route::get('/learning-history', [LearningHistoryController::class, 'index']);
+    Route::get('/learning-history/{id}', [LearningHistoryController::class, 'show'])->whereNumber('id');
 });
 
 Route::prefix('training-batches')->middleware('session.auth')->group(function () {
-    Route::get('/', [\App\Http\Controllers\api\TrainingBatchController::class, 'index']);
-    Route::get('/options', [\App\Http\Controllers\api\TrainingBatchController::class, 'options']);
-    Route::get('/my-learning', [\App\Http\Controllers\api\TrainingBatchController::class, 'learning']);
-    Route::post('/', [\App\Http\Controllers\api\TrainingBatchController::class, 'save']);
-    Route::get('/{id}', [\App\Http\Controllers\api\TrainingBatchController::class, 'show'])->whereNumber('id');
-    Route::put('/{id}', [\App\Http\Controllers\api\TrainingBatchController::class, 'save'])->whereNumber('id');
+    Route::get('/', [TrainingBatchController::class, 'index']);
+    Route::get('/options', [TrainingBatchController::class, 'options']);
+    Route::get('/my-learning', [TrainingBatchController::class, 'learning']);
+    Route::post('/', [TrainingBatchController::class, 'save']);
+    Route::get('/{id}', [TrainingBatchController::class, 'show'])->whereNumber('id');
+    Route::put('/{id}', [TrainingBatchController::class, 'save'])->whereNumber('id');
 });
 
 /*
@@ -38,17 +43,22 @@ Route::prefix('training-batches')->middleware('session.auth')->group(function ()
 
 Route::prefix('v1')->group(function () {
 
-// Session & Auth
-Route::middleware(['web', 'api'])->group(function () {
-    Route::get('/session', function () {
-        return response()->json([
-            'auth' => session('auth'),
-        ]);
-    });
+    // Session & Auth
+    Route::middleware(['web', 'api'])->group(function () {
+        Route::get('/session', function () {
+            $auth = session('auth');
+            if ($auth) {
+                $auth['role'] = RoleAccess::role(request());
+                $auth['roles'] = RoleAccess::roles(request());
+            }
+            return response()->json([
+                'auth' => $auth,
+            ]);
+        });
 
-    Route::post('/login', [LoginController::class, 'aksiLogin'])->middleware('throttle:login');
-    Route::post('/logout', [LoginController::class, 'logout']);
-});
+        Route::post('/login', [LoginController::class, 'aksiLogin'])->middleware('throttle:login');
+        Route::post('/logout', [LoginController::class, 'logout']);
+    });
 
     // Information
     Route::get('/menu/{id}', [InformationController::class, 'menu']);
@@ -77,6 +87,7 @@ Route::middleware(['web', 'api'])->group(function () {
     Route::delete('/courses/{id}', [CourseController::class, 'destroy'])->middleware('session.auth');
     Route::get('/categories', [CourseController::class, 'categories']);
     Route::get('/search', [CourseController::class, 'search']);
+
     // Content
     Route::get('/course/contents/{courseId}', [ContentController::class, 'index']);
     Route::get('/contents/{id}', [ContentController::class, 'show'])->middleware('session.auth');
@@ -94,14 +105,19 @@ Route::middleware(['web', 'api'])->group(function () {
     Route::post('/announcements/{document_id}', [AnnouncementController::class, 'update'])->middleware('session.auth');
     Route::patch('/announcements/{document_id}/restore', [AnnouncementController::class, 'restore'])->middleware('session.auth');
     Route::delete('/announcements/{document_id}', [AnnouncementController::class, 'destroy'])->middleware('session.auth');
-    // Master data
 
+    // Master data
     Route::prefix('master')->group(function () {
         Route::get('jabatan', [MasterController::class, 'getJabatan']);
         Route::get('areas', [MasterController::class, 'getAreas']);
         Route::get('types/{id_menu}', [MasterController::class, 'getTypesByIdMenu']);
         Route::get('wilayah', [MasterController::class, 'getWilayah']);
         Route::get('cabang', [MasterController::class, 'getCabang']);
+        Route::get('roles', [PositionRoleController::class, 'index'])->middleware('session.auth');
+        Route::get('role-employees', [PositionRoleController::class, 'employees'])->middleware('session.auth');
+        Route::post('roles', [PositionRoleController::class, 'store'])->middleware('session.auth');
+        Route::put('roles/{id}', [PositionRoleController::class, 'update'])->middleware('session.auth');
+        Route::delete('roles/{id}', [PositionRoleController::class, 'destroy'])->middleware('session.auth');
     });
 
     // Wizard
@@ -116,21 +132,19 @@ Route::middleware(['web', 'api'])->group(function () {
     Route::get('/document-views/document/{document_id}/unviewed', [DocumentViewController::class, 'unviewedUsers']);
     Route::get('/document-views/document/{document_id}/viewed', [DocumentViewController::class, 'viewedUsers']);
 
-// Report
-Route::middleware(['web', 'api'])->group(function () {
-    Route::get('/report/documents', [\App\Http\Controllers\api\DocumentReportController::class, 'getReport']);
-    Route::get('/report/activity-logs', [\App\Http\Controllers\api\DocumentReportController::class, 'getActivityLogs']);
-    Route::post('/report/activity-logs/export-excel', [\App\Http\Controllers\api\DocumentReportController::class, 'exportActivityLogsExcel']);
-    Route::post('/report/documents/export-excel', [\App\Http\Controllers\api\DocumentReportController::class, 'exportExcel']);
-});
+    // Report
+    Route::middleware(['web', 'api'])->group(function () {
+        Route::get('/report/documents', [DocumentReportController::class, 'getReport']);
+        Route::get('/report/activity-logs', [DocumentReportController::class, 'getActivityLogs']);
+        Route::post('/report/activity-logs/export-excel', [DocumentReportController::class, 'exportActivityLogsExcel']);
+        Route::post('/report/documents/export-excel', [DocumentReportController::class, 'exportExcel']);
+    });
 
 });
 
 // Fallback search route outside v1 prefix
 Route::middleware(['web', 'api'])->get('/search', [CourseController::class, 'search']);
 
-// migrasi data
+// Migrasi data
 Route::get('/migrasi-data', [MigrasiDataController::class, 'export'])->middleware('session.auth');
 Route::post('/migrasi-data', [MigrasiDataController::class, 'import'])->middleware('session.auth');
-
-// routes/api.php;

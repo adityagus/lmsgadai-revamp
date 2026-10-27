@@ -1,4 +1,4 @@
-import type { AdminOverview, BranchNode, Position, Region, UserOverview } from '../types/master.ts';
+import type { AdminOverview, BranchNode, EmployeeItem, Position, PositionRoleResponse, Region, UserOverview } from '../types/master.ts';
 
 import type { CourseSearch } from '../types/course.ts';
 
@@ -72,4 +72,18 @@ export const getOverview = defineQuery<[], DataResponse<AdminOverview>>(
         ({
         data: (await http.get<AdminOverview>("/api/overview", { signal })).data,
     }),
+);
+
+export const getPositionRoles = defineQuery<[search?: string], PositionRoleResponse>(
+    "master",
+    "roles",
+    async ([search], signal) =>
+        (await http.get<PositionRoleResponse>("/master/role-data", { params: { search: search || undefined }, signal })).data,
+);
+
+export const searchRoleEmployees = defineQuery<[q: string], { status: number; data: EmployeeItem[] }>(
+    "master",
+    "role-employees",
+    async ([q], signal) =>
+        (await http.get<{ status: number; data: EmployeeItem[] }>("/master/role-employees", { params: { q: q || undefined }, signal })).data,
 );

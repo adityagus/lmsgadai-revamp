@@ -1,5 +1,15 @@
 # Revamp status
 
+Employee multi-role checklist management (2026-10-27):
+- Implemented user-based multi-role assignment (`lms_user_roles` table and migration) supporting simultaneous multiple roles via checklist (e.g., an employee can be both Trainer and SOP).
+- Updated `UserRole` model with `roles` JSON casting and priority resolution, and updated `PositionRoleController` to serve active employees from `db_gadaimulia` (`db2`), position mappings, and full CRUD for user roles.
+- Enhanced `RoleAccess` service to resolve multi-roles (`rolesForUser`), priority role (`roleForUser`), and multi-role checks (`hasRole`, `isAdmin`, `isTrainer`, `isSop`, `isAudit`, `canManageLearning`, `canManageDocuments`) with dual-level caching (`lms:user_roles` and `lms:position_roles`).
+- Enriched session payload (`auth.role` and `auth.roles`) in `HandleInertiaRequests`, `routes/api.php`, and `routes/legacy.php`.
+- Updated `Sidebar.vue` and `useAuth.ts` to dynamically render navigation items based on assigned multi-roles.
+- Completely redesigned `role-management.vue` for selecting employees from the directory, assigning multiple roles via checkboxes, filtering, and managing assignments.
+- Cleaned all inline FQCNs with top-level `use` statements across controllers, routes, and services.
+- Fix: `GET /master/roles` is owned by the Inertia page route (later same-URI registration wins), so the page's XHR never got JSON. Data now loads from `GET /master/role-data`; employee search is server-side via `GET /master/role-employees?q=` (db2, debounced, 30 results). POST/PUT/DELETE stay on `/master/roles`. Verified route list, db2 search ("abdul" → 3 matches), and typecheck. Feature tests could not run locally (pdo_sqlite driver missing on host PHP).
+
 MinIO-only uploads (2026-10-13):
 - Removed local upload disks, environment switches/root paths (including local .env), optional Compose bind override, symlink creation, and local-copy/comparison tooling. Updated README and Docker/MinIO instructions. Runtime sessions/cache/logs remain local; existing upload files and bucket contents were not deleted or migrated.
 - Renamed upload implementation to MinioFileUploadService, preserving object paths with configured/empty prefixes for archive, restore and delete. Removed Laravel's merged built-in local disk before filesystem boot so its default /storage routes cannot override MinIO streaming. Public thumbnail image access retained while private documents require login.

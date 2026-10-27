@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class Content extends Model
 {
@@ -22,8 +23,19 @@ class Content extends Model
         'updated_at' => 'datetime',
         'content' => 'string',
     ];
+
+    protected static function booted()
+    {
+        static::saving(function ($model) {
+            if (array_key_exists('quiz_id', $model->attributes)) {
+                if (empty($model->attributes['quiz_id']) || !Schema::hasColumn('course_details', 'quiz_id')) {
+                    unset($model->attributes['quiz_id']);
+                }
+            }
+        });
+    }
     
-      public function getFormattedCreatedAtAttribute()
+    public function getFormattedCreatedAtAttribute()
     {
         return $this->created_at->format('Y-m-d H:i:s');
     }

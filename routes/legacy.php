@@ -15,6 +15,8 @@ use App\Http\Controllers\migrasiDataController;
 use App\Http\Controllers\api\FileUploadController;
 use App\Http\Controllers\api\AnnouncementController;
 use App\Http\Controllers\api\DocumentViewController;
+use App\Http\Controllers\api\PositionRoleController;
+use App\Services\RoleAccess;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,7 +28,8 @@ use App\Http\Controllers\api\DocumentViewController;
 Route::get('/session', function () {
     $auth = session('auth');
     if ($auth) {
-        $auth['role'] = app(\App\Services\LmsAccess::class)->role(request());
+        $auth['role'] = RoleAccess::role(request());
+        $auth['roles'] = RoleAccess::roles(request());
     }
     return response()->json([
         'auth' => $auth,
@@ -109,6 +112,12 @@ Route::prefix('master')->group(function () {
     Route::get('types/{id_menu}', [MasterController::class, 'getTypesByIdMenu']);
     Route::get('wilayah', [MasterController::class, 'getWilayah']);
     Route::get('cabang', [MasterController::class, 'getCabang']);
+    Route::get('roles', [PositionRoleController::class, 'index'])->middleware('session.auth');
+    Route::get('role-data', [PositionRoleController::class, 'index'])->middleware('session.auth');
+    Route::get('role-employees', [PositionRoleController::class, 'employees'])->middleware('session.auth');
+    Route::post('roles', [PositionRoleController::class, 'store'])->middleware('session.auth');
+    Route::put('roles/{id}', [PositionRoleController::class, 'update'])->middleware('session.auth');
+    Route::delete('roles/{id}', [PositionRoleController::class, 'destroy'])->middleware('session.auth');
 });
 
 // 🔹 Wizard

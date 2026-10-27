@@ -1,4 +1,4 @@
-export default {
+export const pageRegistry = {
   'learning-history/index': () => import('./pages/learning-history/index.vue'),
   'training-batches/index': () => import('./pages/training-batches/index.vue'),
   'landing-page/pages/home': () => import('./pages/landing-page/pages/home.vue'),
@@ -14,6 +14,7 @@ export default {
   'formulir/index': () => import('./pages/formulir/index.vue'),
   'landing-page/pages/detail': () => import('./pages/landing-page/pages/detail.vue'),
   'master/category': () => import('./pages/master/category.vue'),
+  'master/role-management': () => import('./pages/master/role-management.vue'),
   'pengumuman/archive': () => import('./pages/pengumuman/archive.vue'),
   'pengumuman/create': () => import('./pages/pengumuman/create.vue'),
   'pengumuman/detail': () => import('./pages/pengumuman/detail.vue'),
@@ -25,3 +26,12 @@ export default {
   'quiz/StudentQuiz': () => import('./pages/quiz/StudentQuiz.vue'),
   'report/DocumentReport': () => import('./pages/report/DocumentReport.vue'),
 };
+
+
+export function resolvePageComponent(name) {
+  const importFunction = pageRegistry[name];
+  if (!importFunction) {
+    return null;
+  }
+  return importFunction();
+}

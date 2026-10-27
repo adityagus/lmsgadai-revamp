@@ -188,7 +188,7 @@
             <span>{{ data.value.lastUpdateDisplay }}</span>
           </template>
           <template #action="{ row, value }">
-            <div class="flex gap-2 justify-center items-center">
+            <div class="flex gap-2 justify-center items-center" v-if="canManageDocuments">
               <button @click.stop="router.push({ name: 'information-document-update', params: { id: value.id } })"
                 class="bg-white border border-sidebar text-sidebar px-2 py-1 rounded shadow hover:bg-purple-100 transition text-xs font-semibold inline-flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -322,7 +322,7 @@ const isAdmin = computed(() =>
 );
 
 const canManageDocuments = computed(() =>
-  isAdmin.value && !['JBT-019', 'JBT-020', '042', 'JBT-TRAINER'].includes(auth.value?.idgrup)
+  isAdmin.value && !['JBT-019', 'JBT-020'].includes(auth.value?.idgrup)
 );
 
 const tableCols = computed(() => {
@@ -333,7 +333,7 @@ const tableCols = computed(() => {
     { field: 'tglBerlakuRaw', title: 'Tanggal Berlaku', cellClass: 'text-center', headerClass: 'text-center justify-center' },
     { field: 'lastUpdateRaw', title: 'Terakhir Diperbarui' }
   ];
-  if (isAdmin.value) {
+  if (canManageDocuments.value) {
     cols.push({
       field: 'action',
       title: 'Aksi',

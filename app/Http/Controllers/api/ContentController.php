@@ -73,7 +73,12 @@ class ContentController extends Controller
         $validated['content'] = $request->get('content', null); 
       }
 
-      if (!empty($validated['quiz_id'])) { $validated['content'] = null; }
+      if (!empty($validated['quiz_id'])) {
+          $validated['content'] = null;
+      }
+      if (empty($validated['quiz_id']) || !\Illuminate\Support\Facades\Schema::hasColumn('course_details', 'quiz_id')) {
+          unset($validated['quiz_id']);
+      }
       $contents = Content::create($validated);
       app(\App\Services\Quiz\AttemptHistory::class)->content($contents);
 
@@ -113,7 +118,12 @@ class ContentController extends Controller
             $validated['lampiran'] = $lampiranPath;
         }
 
-        if (!empty($validated['quiz_id'])) { $validated['content'] = null; }
+        if (!empty($validated['quiz_id'])) {
+            $validated['content'] = null;
+        }
+        if (empty($validated['quiz_id']) || !\Illuminate\Support\Facades\Schema::hasColumn('course_details', 'quiz_id')) {
+            unset($validated['quiz_id']);
+        }
         app(\App\Services\Quiz\AttemptHistory::class)->content($content);
         $content->update($validated);
         app(\App\Services\Quiz\AttemptHistory::class)->content($content);

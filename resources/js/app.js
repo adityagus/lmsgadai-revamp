@@ -5,11 +5,12 @@ import { VueQueryPlugin } from '@tanstack/vue-query';
 import { queryClient, clearApiCache } from './api/queryClient.ts';
 import AppLayout from './layouts/AppLayout.vue';
 import { RouterLink, useRoute, useRouter, installNavigationGuards } from './navigation';
-import pages from './pageRegistry';
+import { pageRegistry } from './pageRegistry.js';
+
 createInertiaApp({
   title: title => `${title} · LMS Gadai Mulia`,
   resolve: async name => {
-    const loader = pages[name];
+    const loader = pageRegistry[name];
     if (!loader) throw new Error(`Page not found: ${name}`);
     const component = (await loader()).default;
     component.layout = (render, page) => page.props.fullscreen ? page : render(AppLayout, {}, () => page);

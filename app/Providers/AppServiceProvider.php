@@ -2,6 +2,22 @@
 
 namespace App\Providers;
 
+use App\Contracts\FileUploadServiceInterface;
+use App\Contracts\Repositories\DocumentViewRepositoryInterface;
+use App\Contracts\Repositories\MasterRepositoryInterface;
+use App\Contracts\Repositories\UserRepositoryInterface;
+use App\Contracts\Services\DocumentViewServiceInterface;
+use App\Repositories\DocumentViewRepository;
+use App\Repositories\MasterRepository;
+use App\Repositories\UserRepository;
+use App\Services\DocumentViewService;
+use App\Services\MaintenanceSettings;
+use App\Services\MinioFileUploadService;
+use App\Services\RoleAccess;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,11 +35,11 @@ class AppServiceProvider extends ServiceProvider
         unset($disks['local']);
         config(['filesystems.disks' => $disks]);
 
-        $this->app->bind(\App\Contracts\FileUploadServiceInterface::class, \App\Services\MinioFileUploadService::class);
-        $this->app->bind(\App\Contracts\Repositories\MasterRepositoryInterface::class, \App\Repositories\MasterRepository::class);
-        $this->app->bind(\App\Contracts\Repositories\UserRepositoryInterface::class, \App\Repositories\UserRepository::class);
-        $this->app->bind(\App\Contracts\Repositories\DocumentViewRepositoryInterface::class, \App\Repositories\DocumentViewRepository::class);
-        $this->app->bind(\App\Contracts\Services\DocumentViewServiceInterface::class, \App\Services\DocumentViewService::class);
+        $this->app->bind(FileUploadServiceInterface::class, MinioFileUploadService::class);
+        $this->app->bind(MasterRepositoryInterface::class, MasterRepository::class);
+        $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
+        $this->app->bind(DocumentViewRepositoryInterface::class, DocumentViewRepository::class);
+        $this->app->bind(DocumentViewServiceInterface::class, DocumentViewService::class);
     }
 
     /**
@@ -34,14 +50,23 @@ class AppServiceProvider extends ServiceProvider
     public function boot()
     {
         if (env('DOCKER_DEV', false)) {
-            \Illuminate\Support\Facades\Vite::useHotFile(storage_path('framework/vite.hot'));
+            Vite::useHotFile(storage_path('framework/vite.hot'));
         }
+
         config(['app.timezone' => 'Asia/Jakarta']);
         date_default_timezone_set('Asia/Jakarta');
-        \Illuminate\Support\Facades\RateLimiter::for('login', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by($request->ip().'|'.strtolower((string) $request->input('user'))));
-        \Illuminate\Support\Facades\RateLimiter::for('api', fn ($request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($request->session()->get('auth.user', $request->ip())));
+
+        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)->by($request->ip().'|'.strtolower((string) $request->input('user'))));
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)->by($request->session()->get('auth.user', $request->ip())));
+
         view()->composer(['errors.503', 'errors::503'], function ($view) {
-            $view->with('maintenanceHours', app(\App\Services\MaintenanceSettings::class)->estimatedHours());
+            $view->with('maintenanceHours', app(MaintenanceSettings::class)->estimatedHours());
         });
+
+        // Request macros for clean role & authorization checks
+        Request::macro('role', fn () => RoleAccess::role($this));
+        Request::macro('isAdmin', fn () => RoleAccess::isAdmin($this));
+        Request::macro('canManageLearning', fn () => RoleAccess::canManageLearning($this));
+        Request::macro('canManageDocuments', fn () => RoleAccess::canManageDocuments($this));
     }
 }

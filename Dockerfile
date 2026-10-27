@@ -5,7 +5,7 @@ RUN npm ci --no-audit --no-fund --foreground-scripts --loglevel=verbose --fetch-
 COPY . .
 RUN npm run build
 
-FROM php:8.3-apache-bookworm
+FROM php:8.3.36-apache
 RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
     libonig-dev libpq-dev libcurl4-openssl-dev libxml2-dev \

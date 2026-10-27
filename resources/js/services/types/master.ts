@@ -43,3 +43,67 @@ export interface UserOverview {
     last_courses: Course[];
     last_documents: Announcement[];
 }
+
+export interface PositionRole {
+    id: Id;
+    position_code: string;
+    position_name?: string | null;
+    role: 'admin' | 'trainer' | 'sop' | 'audit' | 'student';
+    description?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface RoleOption {
+    role: string;
+    label: string;
+    badge_color: string;
+    description: string;
+}
+
+export interface UserRoleItem {
+    id: Id;
+    username: string;
+    name?: string | null;
+    position?: string | null;
+    role: string;
+    roles: string[];
+    description?: string | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface EmployeeItem {
+    username: string;
+    name: string;
+    position?: string | null;
+}
+
+export interface UserRolePayload {
+    username: string;
+    name?: string | null;
+    position?: string | null;
+    roles: string[];
+    description?: string | null;
+}
+
+export interface PositionRoleResponse {
+    status: number;
+    data: any[];
+    user_roles?: UserRoleItem[];
+    position_roles?: PositionRole[];
+    employees?: EmployeeItem[];
+    positions?: Array<{ position_code: string; position_name: string }>;
+    available_roles: RoleOption[];
+}
+
+export interface PositionRolePayload {
+    position_code?: string;
+    position_name?: string | null;
+    username?: string;
+    name?: string | null;
+    position?: string | null;
+    role?: string;
+    roles?: string[];
+    description?: string | null;
+}
