@@ -151,13 +151,18 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { useRouter } from '@/navigation';
 import CardCourses from '@/pages/courses/card.vue';
 import { adminOverview, userOverview } from '@/services/queries/masterQuery.ts';
 import { getLastDocumentPreview } from '@/services/queries/announcementQuery.ts';
 import { recordDocumentView } from '@/services/mutations/documentViewMutation.ts';
 import OpenModalPDF from '@/components/openModalPDF.vue';
+const router = useRouter();
 const page = usePage();
 const user = ref(page.props.auth || {});
+if (user.value.is_trainee || String(user.value.idgrup || '').toUpperCase().startsWith('JBT-748')) {
+  router.replace('/student/kelas');
+}
 const overview = ref({total_courses:page.props.stats?.courses || 0,total_pengumuman:0,total_formulir:0});
 const showModal = ref(false);
 const selectedCard = ref(null);

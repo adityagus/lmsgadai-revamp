@@ -177,7 +177,8 @@ const submitLogin = async () => {
       pass: password.value
     });
     if (response.success) {
-      await router.push('/overview');
+      const redirectTarget = response.redirect || '/overview';
+      await router.push(redirectTarget);
     } else {
       alert("Username atau password salah");
     }

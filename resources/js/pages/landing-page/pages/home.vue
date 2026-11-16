@@ -21,9 +21,9 @@
                 </nav>
                 <div class="header-actions">
                     <Link
-                        :href="signedIn ? '/overview' : '/sign-in'"
+                        :href="signedIn ? (isTrainee ? '/student/kelas' : '/overview') : '/sign-in'"
                         class="button lms-primary-button"
-                        >{{ signedIn ? "Dashboard" : "Sign In" }}</Link
+                        >{{ signedIn ? (isTrainee ? "Pembelajaran" : "Dashboard") : "Sign In" }}</Link
                     ><button
                         class="menu-toggle"
                         :aria-expanded="menuOpen"
@@ -398,6 +398,7 @@ import { getPopularCourses } from "@/services/queries/courseQuery.ts";
 import "primeicons/primeicons.css";
 const page = usePage();
 const signedIn = computed(() => Boolean(page.props.auth?.user));
+const isTrainee = computed(() => Boolean(page.props.auth?.is_trainee || String(page.props.auth?.idgrup || '').toUpperCase().startsWith('JBT-748')));
 const menuOpen = ref(false);
 const {
     data: courseData,

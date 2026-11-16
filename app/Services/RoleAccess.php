@@ -204,6 +204,14 @@ class RoleAccess
         return static::hasRole('audit', $request);
     }
 
+    public static function isTrainee(?Request $request = null): bool
+    {
+        $request ??= request();
+        $auth = $request->session()->get('auth', []);
+        $position = strtoupper(trim((string) ($auth['idgrup'] ?? '')));
+        return $position === 'JBT-748' || str_starts_with($position, 'JBT-748');
+    }
+
     public static function canManageDocuments(?Request $request = null): bool
     {
         return static::hasRole(['admin', 'sop'], $request);
