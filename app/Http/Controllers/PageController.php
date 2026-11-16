@@ -5,6 +5,7 @@ use App\Models\Announcement;
 use App\Models\Course;
 use App\Models\Content;
 use App\Services\LmsAccess;
+use App\Services\RoleAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -24,6 +25,9 @@ class PageController extends Controller
             ],
         ];
         if ($route->defaults['page'] === 'Dashboard') {
+            if (RoleAccess::isTrainee($request)) {
+                return redirect('/student/kelas');
+            }
             $role = app(LmsAccess::class)->role($request);
             $documents = Announcement::forUser(session('auth.idgrup'), session('auth.cabang'));
             $props['stats'] = [

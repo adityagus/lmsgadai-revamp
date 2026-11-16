@@ -41,7 +41,7 @@
                             UMUM
                         </p>
                         <li
-                            v-if="auth"
+                            v-if="auth && !isTrainee"
                             :class="{ active: $route.name === 'overview' }"
                             class="transition-all duration-200"
                         >
@@ -89,7 +89,7 @@
                                 >
                             </div>
                         </li>
-                        <li v-if="auth" class="transition-all duration-200">
+                        <li v-if="auth && !isTrainee" class="transition-all duration-200">
                             <div
                                 @click="handleParentClick('info')"
                                 :class="[
@@ -182,7 +182,7 @@
                     <!-- IT SPV,  -->
                     <ul
                         class="flex flex-col gap-4"
-                        v-if="hasAuthRole('admin') || hasAuthRole('trainer')"
+                        v-if="!isTrainee && (hasAuthRole('admin') || hasAuthRole('trainer'))"
                     >
                         <p
                             class="font-semibold text-xs leading-[18px] text-white"
@@ -314,6 +314,7 @@
                         class="flex flex-col gap-4"
                         v-if="
                             auth &&
+                            !isTrainee &&
                             (hasAuthRole('admin') ||
                                 hasAuthRole('sop') ||
                                 hasAuthRole('audit') ||
@@ -413,17 +414,27 @@ const hasAuthRole = (roleToCheck) => {
     return authRoles.value.includes(String(roleToCheck).toLowerCase());
 };
 
+const isTrainee = computed(() => {
+    if (auth.value?.is_trainee !== undefined) return Boolean(auth.value.is_trainee);
+    const idgrup = String(auth.value?.idgrup || '').toUpperCase();
+    return idgrup === 'JBT-053' || idgrup.startsWith('JBT-053');
+});
+
 const quizManager = computed(
     () =>
-        hasAuthRole("admin") ||
-        hasAuthRole("trainer") ||
-        hasAuthRole("teacher") ||
-        ["JBT-032", "JBT-038", "JBT-019", "042"].includes(auth.value?.idgrup),
+        !isTrainee.value && (
+            hasAuthRole("admin") ||
+            hasAuthRole("trainer") ||
+            hasAuthRole("teacher") ||
+            ["JBT-032", "JBT-038", "JBT-019", "042"].includes(auth.value?.idgrup)
+        ),
 );
 const isAdmin = computed(
     () =>
-        hasAuthRole("admin") ||
-        ["JBT-032", "JBT-047"].includes(auth.value?.idgrup),
+        !isTrainee.value && (
+            hasAuthRole("admin") ||
+            ["JBT-032", "JBT-047"].includes(auth.value?.idgrup)
+        ),
 );
 const isMobile = ref(window.innerWidth < 768);
 

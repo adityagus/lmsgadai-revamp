@@ -209,7 +209,7 @@ class RoleAccess
         $request ??= request();
         $auth = $request->session()->get('auth', []);
         $position = strtoupper(trim((string) ($auth['idgrup'] ?? '')));
-        return $position === 'JBT-748' || str_starts_with($position, 'JBT-748');
+        return $position === 'JBT-053' || str_starts_with($position, 'JBT-053');
     }
 
     public static function canManageDocuments(?Request $request = null): bool

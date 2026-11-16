@@ -17,6 +17,7 @@ class HandleInertiaRequests extends Middleware
                 [
                     'role' => RoleAccess::role($request),
                     'roles' => RoleAccess::roles($request),
+                    'is_trainee' => RoleAccess::isTrainee($request),
                 ]
             ) : null,
             'csrfToken' => fn () => csrf_token(),

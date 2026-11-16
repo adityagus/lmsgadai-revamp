@@ -14,6 +14,7 @@ return [
         'JBT-047' => 'admin',
         '042' => 'trainer',
         'JBT-TRAINER' => 'trainer',
+        'JBT-053' => 'student',
     ],
 
     'groups' => [

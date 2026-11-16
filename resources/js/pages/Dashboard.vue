@@ -160,7 +160,7 @@ import OpenModalPDF from '@/components/openModalPDF.vue';
 const router = useRouter();
 const page = usePage();
 const user = ref(page.props.auth || {});
-if (user.value.is_trainee || String(user.value.idgrup || '').toUpperCase().startsWith('JBT-748')) {
+if (user.value.is_trainee || String(user.value.idgrup || '').toUpperCase().startsWith('JBT-053')) {
   router.replace('/student/kelas');
 }
 const overview = ref({total_courses:page.props.stats?.courses || 0,total_pengumuman:0,total_formulir:0});

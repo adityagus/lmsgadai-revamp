@@ -59,6 +59,7 @@
               :class="['px-4 py-2 font-semibold', searchTab === 'kelas' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500']"
               @click="searchTab = 'kelas'">Kelas</button>
             <button
+              v-if="!isTrainee"
               :class="['px-4 py-2 font-semibold', searchTab === 'informasi' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500']"
               @click="searchTab = 'informasi'">Informasi</button>
           </div>
@@ -227,7 +228,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import { useRoute, useRouter } from '@/navigation';
 import { usePage, router as inertiaRouter } from '@inertiajs/vue3';
 import { getSession } from '@/services/queries/authQuery.ts';
@@ -246,6 +247,11 @@ const route = useRoute();
 const page = usePage();
 const nama = ref(page.props.auth?.user || '');
 const jabatan = ref(page.props.auth?.jabatan || '');
+const isTrainee = computed(() => {
+  if (page.props.auth?.is_trainee !== undefined) return Boolean(page.props.auth.is_trainee);
+  const idgrup = String(page.props.auth?.idgrup || '').toUpperCase();
+  return idgrup === 'JBT-053' || idgrup.startsWith('JBT-053');
+});
 const searchResultsCourse = ref([]);
 const searchResultsDocument = ref([]);
 const isSearching = ref(false);

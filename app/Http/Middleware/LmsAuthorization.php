@@ -2,6 +2,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\LmsAccess;
+use App\Services\RoleAccess;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -55,6 +56,33 @@ class LmsAuthorization
         if ($role === 'audit') {
             abort_if($short === 'DocumentReportController' && in_array($method, ['exportExcel', 'exportActivityLogsExcel'], true), 403);
             abort_if($request->is('information-document/*', 'archive-pengumuman', 'courses/*', 'course/create-contents/*', 'course/update-contents/*', 'quiz/manage*'), 403);
+        }
+        if (RoleAccess::isTrainee($request)) {
+            abort_if(
+                $request->is(
+                    'information-document*',
+                    'archive-pengumuman*',
+                    'pengumuman*',
+                    'formulir*',
+                    'detail-pengumuman*',
+                    'report*',
+                    'master*',
+                    'kelas*',
+                    'courses*',
+                    'course/create-contents*',
+                    'course/update-contents*',
+                    'quiz/manage*',
+                    'riwayat-belajar*',
+                    'batch-pelatihan*',
+                    'api/announcements*',
+                    'api/formulir*',
+                    'api/v1/pengumuman*',
+                    'api/user-overview*',
+                    'api/admin-overview*'
+                ),
+                403,
+                'Akses ditolak. Peserta training hanya dapat mengakses menu Pembelajaran.'
+            );
         }
         return $next($request);
     }
