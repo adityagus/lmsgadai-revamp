@@ -9,6 +9,7 @@ Route::get('/storage/{path}', StoredFileController::class)->where('path', '.*');
 require __DIR__.'/legacy.php';
 Route::get('/api/popular-courses', [CourseController::class, 'popular']);
 Route::get('/sign-in', fn () => session('auth.user') ? redirect(str_starts_with(strtoupper(trim((string) session('auth.idgrup'))), 'JBT-053') ? '/student/kelas' : '/overview') : Inertia::render('Auth/SignIn', ['title' => 'Masuk', 'fullscreen' => true]))->name('login');
+Route::get('/login', fn () => redirect('/sign-in'));
 Route::redirect('/lms', '/kelas');
 Route::redirect('/report', '/report/documents');
 Route::redirect('/roles', '/master/roles');

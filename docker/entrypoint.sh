@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+if [ -z "${APP_KEY:-}" ] && [ -f .env ]; then
+    APP_KEY=$(grep -E '^APP_KEY=' .env | head -n 1 | cut -d '=' -f 2- | tr -d '\r"')
+    export APP_KEY
+fi
+
 if [ -z "${APP_KEY:-}" ]; then
     echo "APP_KEY belum diisi di .env. Gunakan key aplikasi yang sudah ada." >&2
     exit 1
