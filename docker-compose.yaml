@@ -22,7 +22,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - runtime:/var/www/html/storage
-
+      - ./:/var/www/html
+      - /var/www/html/public/build
+      - /var/www/html/vendor
 volumes:
   runtime:
