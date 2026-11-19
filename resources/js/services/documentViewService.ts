@@ -1,5 +1,8 @@
 // Compatibility exports. New callers import queries/ or mutations/ directly.
-export { recordDocumentView } from "./mutations/documentViewMutation.ts";
+export {
+    recordDocumentView,
+    recordDocumentDownload,
+} from "./mutations/documentViewMutation.ts";
 export {
     checkDocumentViewed,
     getUnviewedUsers,

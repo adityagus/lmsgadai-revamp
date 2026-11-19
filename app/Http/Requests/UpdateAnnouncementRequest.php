@@ -27,7 +27,7 @@ class UpdateAnnouncementRequest extends FormRequest
             'submenu_id' => 'required|integer',
             'title' => 'required|string|max:150',
             'no_surat' => 'nullable|string|max:255',
-            'dokumen' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx|max:20480', // max 20MB
+            'dokumen' => 'nullable|file|mimes:pdf,doc,docx,pptx,xlsx,xls|max:2048', // max 2MB
             'type' => 'string|max:100',
             'content' => 'nullable|string|max:10000',
             'tgl_berlaku' => 'nullable|date',

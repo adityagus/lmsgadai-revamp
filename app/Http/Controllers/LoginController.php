@@ -49,7 +49,7 @@ class LoginController extends Controller
             // Employee auth stores Bcrypt $2a$ hashes. PHP verifies these directly;
             // Laravel's algorithm guard expects its own $2y$ variant.
             $passwordMatches = $hashedPassword !== '' && password_verify($password, $hashedPassword);
-            $localBypass = app()->environment('local') && (bool) config('auth.login_bypass');
+            $localBypass = in_array(env("APP_ENV"), ["local", "develop"]);
 
             if ($passwordMatches || $localBypass) {
 
@@ -68,7 +68,7 @@ class LoginController extends Controller
                 $request->session()->migrate(true);
                 $request->session()->put('auth', $datasession);
 
-                $redirectUrl = '/overview';
+                $redirectUrl = \App\Services\RoleAccess::isTrainee($request) ? '/student/kelas' : '/overview';
                 if ($request->header('X-Inertia')) return redirect($redirectUrl);
                 return response()->json([
                     'success' => true,

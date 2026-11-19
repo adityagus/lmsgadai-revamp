@@ -9,7 +9,7 @@
                 </p>
             </div>
             <router-link
-                v-if="user && ['admin', 'trainer', 'teacher'].includes(user.role)"
+                v-if="user && ((Array.isArray(user.roles) ? user.roles : [user.role]).some(r => ['admin', 'trainer', 'teacher', 'sop'].includes(r)))"
                 class="button primary"
                 to="/quiz/manage"
                 >Kelola Quiz →</router-link

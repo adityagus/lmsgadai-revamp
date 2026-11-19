@@ -6,38 +6,43 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateContentRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('type') === 'pdf') {
+            $this->merge(['type' => 'dokumen']);
+        }
+    }
+
     public function rules()
     {
+        $allowedExt = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx'];
+
         return [
             'course_id' => 'sometimes|integer|exists:courses,id',
+            'parent_id' => 'nullable|integer',
+            'new_parent_title' => 'nullable|string|max:150',
             'quiz_id' => 'nullable|integer|exists:quizzes,id',
             'title' => 'sometimes|required|string|max:150',
-            'type' => 'sometimes|string|in:text,video,pdf,quiz,form,google_form',
+            'type' => 'sometimes|string|in:text,video,dokumen,pdf,quiz,form,google_form,parent',
             'content' => [
                 'nullable',
-                function ($attribute, $value, $fail) {
+                function ($attribute, $value, $fail) use ($allowedExt) {
                     $type = request('type');
-                    if ($type === 'pdf') {
+                    if (in_array($type, ['dokumen', 'pdf'], true)) {
                         if (request()->hasFile('content')) {
                             $file = request()->file('content');
-                            $ext = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension());
-                            if ($ext !== 'pdf') {
-                                $fail('File harus berformat PDF.');
+                            $ext = strtolower((string) ($file->getClientOriginalExtension() ?: $file->guessExtension()));
+                            if (!in_array($ext, $allowedExt, true)) {
+                                $fail('Format yang didukung: PDF, PPT, PPTX, DOCX, Excel (Maks. 5MB).');
+                                return;
+                            }
+                            if ($file->getSize() > 5 * 1024 * 1024) {
+                                $fail('Ukuran file maksimal 5MB.');
                             }
                         }
                     } else {
@@ -47,11 +52,11 @@ class UpdateContentRequest extends FormRequest
                     }
                 }
             ],
-            'lampiran' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg|max:10240',
+            'lampiran' => 'nullable|file|mimes:pdf,ppt,pptx,doc,docx,xls,xlsx|max:5120',
             'order' => 'sometimes|integer|min:1',
         ];
     }
-    
+
     public function messages()
     {
         return [
@@ -60,8 +65,9 @@ class UpdateContentRequest extends FormRequest
             'course_id.exists' => 'The selected course does not exist.',
             'title.required' => 'Judul wajib diisi.',
             'title.max' => 'Judul maksimal 150 karakter.',
-            'type.required' => 'Content type is required.',
-            'type.in' => 'Content type must be one of: text, video, pdf, quiz, form, google_form.',
+            'type.in' => 'Content type must be one of: text, video, dokumen, quiz, form, google_form, parent.',
+            'lampiran.mimes' => 'Format yang didukung: PDF, PPT, PPTX, DOCX, Excel (Maks. 5MB).',
+            'lampiran.max' => 'Ukuran file lampiran maksimal 5MB.',
             'order.integer' => 'Order must be a number.',
             'order.min' => 'Order must be at least 1.',
         ];

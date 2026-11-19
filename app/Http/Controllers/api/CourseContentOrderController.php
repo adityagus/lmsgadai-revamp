@@ -13,7 +13,7 @@ class CourseContentOrderController extends Controller
 {
     private function authorizeManager(Request $request): void
     {
-        abort_unless(in_array(app(LmsAccess::class)->role($request), ['admin', 'teacher', 'trainer'], true), 403);
+        \App\Services\RoleAccess::assertLearningManager($request);
     }
 
     public function index(Request $request, int $id)

@@ -16,7 +16,7 @@ export interface CategorySaved {
     category: Category;
 }
 
-export type ContentType = "text" | "video" | "pdf" | "form" | "google_form" | "quiz";
+export type ContentType = "text" | "video" | "dokumen" | "pdf" | "form" | "google_form" | "quiz" | "parent";
 
 export interface CourseContent {
     id: number;

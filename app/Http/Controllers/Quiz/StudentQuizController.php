@@ -37,7 +37,13 @@ class StudentQuizController extends Controller
         })->orderByDesc('id')->get();
         $items = [];
         foreach ($quizzes as $quiz) {
-            if ($batchCourses !== null && !$batchCourses->contains($quiz->course_id)) continue;
+            $quizCourseIds = \Illuminate\Support\Facades\Schema::hasTable('quiz_courses')
+                ? DB::table('quiz_courses')->where('quiz_id', $quiz->id)->pluck('course_id')->map(fn ($v) => (int) $v)->all()
+                : [];
+            if ($quiz->course_id && !in_array((int) $quiz->course_id, $quizCourseIds, true)) {
+                $quizCourseIds[] = (int) $quiz->course_id;
+            }
+            if ($batchCourses !== null && $batchCourses->intersect($quizCourseIds)->isEmpty()) continue;
             if (!$this->service->assigned($quiz, $user)) {
                 continue;
             }

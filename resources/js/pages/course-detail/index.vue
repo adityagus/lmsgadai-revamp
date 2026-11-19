@@ -18,6 +18,9 @@
   <template v-else>
   <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-[30px] mb-4 sm:mb-6">
     <div>
+      <RouterLink to="/kelas" class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#838C9D] hover:text-[#662FFF] mb-1">
+        <span>← Kembali ke Kelola Kelas</span>
+      </RouterLink>
       <h1 class="font-extrabold text-2xl sm:text-[28px] leading-tight sm:leading-[42px]">
         {{ course?.name }}
       </h1>
@@ -26,6 +29,10 @@
       <RouterLink :to="`/courses/${course.id}/edit`"
         class="flex-1 sm:flex-none w-fit rounded-full border border-[#060A23] px-4 py-2.5 sm:px-[20px] sm:py-[14px] font-semibold text-nowrap text-center text-xs sm:text-sm hover:bg-gray-50 transition-colors">
         Edit Kelas
+      </RouterLink>
+      <RouterLink :to="`/kelas/${course.id}/sertifikat`"
+        class="flex-1 sm:flex-none w-fit rounded-full border border-[#662FFF] text-[#662FFF] bg-purple-50 px-4 py-2.5 sm:px-[20px] sm:py-[14px] font-semibold text-nowrap text-center text-xs sm:text-sm hover:bg-purple-100 transition-colors">
+        Template Sertifikat
       </RouterLink>
       <RouterLink :to="`/course/${course.id}/preview`"
         class="flex-1 sm:flex-none w-fit rounded-full px-4 py-2.5 sm:px-[20px] sm:py-[14px] font-semibold text-white bg-[#662FFF] text-nowrap text-center text-xs sm:text-sm hover:bg-[#5521cc] transition-colors">

@@ -41,7 +41,7 @@ class CourseAudience
 
     public function allows(int $courseId, Request $request): bool
     {
-        if (in_array(app(LmsAccess::class)->role($request), ['admin', 'trainer', 'teacher'], true)) return true;
+        if (\App\Services\RoleAccess::canManageLearning($request)) return true;
         $rules = $this->read($courseId);
         if ($request->session()->get('auth.status') !== 'login') return false;
         $username = (string) $request->session()->get('auth.user', '');

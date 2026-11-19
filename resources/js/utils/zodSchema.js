@@ -67,9 +67,11 @@ export const AnnouncementInfoSchema = z.object({
 export const mutateContentSchema = z
     .object({
         title: z.string().trim().min(1, { message: "Judul wajib diisi" }).max(150, { message: "Judul maksimal 150 karakter" }),
-        type: z.enum(["text", "video", "pdf", "form", "google_form", "quiz"], {
+        type: z.enum(["text", "video", "dokumen", "pdf", "form", "google_form", "quiz", "parent"], {
             errorMap: () => ({ message: "Required content type" }),
         }),
+        parent_id: z.number().or(z.string()).nullable().optional(),
+        new_parent_title: z.string().optional(),
         youtubeId: z.string().optional(),
         formUrl: z.string().optional(),
         text: z.string().optional(),

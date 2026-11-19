@@ -37,7 +37,7 @@ class CourseService
     {
         // Query fresh: Laravel 13 disallows cached PHP objects, and both apps edit these courses.
         $query = Course::with('category:id,name')->orderByDesc('id');
-        if ($request && Schema::hasTable('course_access_rules') && $request->session()->get('auth.status') === 'login' && !in_array(app(LmsAccess::class)->role($request), ['admin', 'trainer', 'teacher'], true)) {
+        if ($request && Schema::hasTable('course_access_rules') && $request->session()->get('auth.status') === 'login' && !\App\Services\RoleAccess::canManageLearning($request)) {
             $allowed = DB::table('course_access_rules')->where('position_code', $request->session()->get('auth.idgrup'))->pluck('course_id');
             $allowed = $allowed->merge(app(TrainingBatchAccess::class)->courseIds((string) $request->session()->get('auth.user')));
             if (Schema::hasTable('course_participants')) {

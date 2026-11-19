@@ -53,6 +53,35 @@
       </div>
     </div>
 
+    <div v-else-if="isNonPdfFile" class="w-full rounded-2xl border border-[#CFDBEF] bg-white p-6 sm:p-10 flex flex-col items-center text-center gap-4 shadow-xs">
+      <div class="w-16 h-16 rounded-2xl bg-purple-50 text-[#662FFF] flex items-center justify-center">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <div>
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-[#662FFF] uppercase mb-2">
+          {{ nonPdfLabel }}
+        </span>
+        <h3 class="font-bold text-base sm:text-lg text-[#060A23] break-all">{{ rawFileName }}</h3>
+        <p class="text-xs sm:text-sm text-[#838C9D] mt-1">
+          Berkas ini tidak dapat dipratinjau langsung di browser. Silakan unduh untuk membukanya.
+        </p>
+      </div>
+      <button
+        v-if="allowDownload"
+        type="button"
+        @click="handleNonPdfDownload"
+        :disabled="isDownloading"
+        class="inline-flex items-center gap-2 rounded-full bg-[#662FFF] hover:bg-[#5422DB] text-white font-semibold text-xs sm:text-sm px-6 py-3 transition-colors cursor-pointer disabled:opacity-50"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+        </svg>
+        <span>{{ isDownloading ? 'Mengunduh...' : 'Unduh Berkas' }}</span>
+      </button>
+    </div>
+
     <template v-else-if="pdfUrl">
       <!-- Download Button Bar above the dark PDF viewer container -->
       <div v-if="allowDownload && totalPages > 0" class="w-full flex justify-end items-center mb-2 px-1">
@@ -60,7 +89,7 @@
           @click="handleDownload"
           :disabled="isDownloading"
           class="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-medium text-xs sm:text-sm rounded-lg shadow-md transition disabled:opacity-50 cursor-pointer"
-          title="Unduh PDF"
+          title="Unduh Berkas"
         >
           <svg v-if="!isDownloading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -69,7 +98,7 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>{{ isDownloading ? 'Mengunduh...' : 'Unduh PDF' }}</span>
+          <span>{{ isDownloading ? 'Mengunduh...' : 'Unduh Berkas' }}</span>
         </button>
       </div>
 
@@ -108,6 +137,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { createWatermarkedPdf, downloadWatermarkedPdf } from '@/utils/pdfWatermark'
+import { logDocumentDownload } from '@/services/mutations/documentViewMutation.ts'
 
 const props = defineProps({
   content: {
@@ -117,6 +147,10 @@ const props = defineProps({
   allowDownload: {
     type: Boolean,
     default: true
+  },
+  documentId: {
+    type: [Number, String],
+    default: null
   }
 })
 
@@ -132,6 +166,27 @@ const activeScale = ref(1.0)
 const isManualZoom = ref(false)
 const containerRef = ref(null)
 
+const rawFileName = computed(() => {
+  if (!props.content) return 'berkas'
+  const clean = String(props.content).split('?')[0]
+  return decodeURIComponent(clean.split('/').pop() || 'berkas')
+})
+
+const fileExtension = computed(() => {
+  const m = rawFileName.value.toLowerCase().match(/\.([a-z0-9]+)$/)
+  return m ? m[1] : ''
+})
+
+const isNonPdfFile = computed(() => ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'].includes(fileExtension.value))
+
+const nonPdfLabel = computed(() => {
+  const ext = fileExtension.value.toUpperCase()
+  if (ext === 'DOC' || ext === 'DOCX') return `Word (${ext})`
+  if (ext === 'PPT' || ext === 'PPTX') return `PowerPoint (${ext})`
+  if (ext === 'XLS' || ext === 'XLSX') return `Excel (${ext})`
+  return ext || 'DOKUMEN'
+})
+
 const pdfFileName = computed(() => {
   if (props.content) {
     const rawName = props.content.split('/').pop() || 'dokumen.pdf'
@@ -140,10 +195,34 @@ const pdfFileName = computed(() => {
   return 'dokumen_gadai_mulia.pdf'
 })
 
+async function handleNonPdfDownload() {
+  if (!originalPdfUrl.value || isDownloading.value) return
+  isDownloading.value = true
+  try {
+    if (props.documentId) {
+      logDocumentDownload(props.documentId).catch((e) => console.warn('Failed to log download:', e))
+    }
+    const url = originalPdfUrl.value.includes('?')
+      ? `${originalPdfUrl.value}&download=1`
+      : `${originalPdfUrl.value}?download=1`
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', rawFileName.value)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  } finally {
+    isDownloading.value = false
+  }
+}
+
 async function handleDownload() {
   if (!originalPdfUrl.value || isDownloading.value) return
   isDownloading.value = true
   try {
+    if (props.documentId) {
+      logDocumentDownload(props.documentId).catch((e) => console.warn('Failed to log download:', e))
+    }
     await downloadWatermarkedPdf(originalPdfUrl.value, pdfFileName.value)
   } catch (err) {
     console.error('Failed to download watermarked PDF:', err)
@@ -492,6 +571,12 @@ watch(() => props.content, async (newContent) => {
     } catch (e) {}
   }
   rawPath = rawPath.replace(/^\/+/, '').replace(/^storage\//, '')
+
+  if (isNonPdfFile.value) {
+    originalPdfUrl.value = resolveFileUrl(rawPath)
+    isLoading.value = false
+    return
+  }
 
   const filenameOnly = rawPath.split('/').pop()
   const rawPathDecoded = decodeURIComponent(rawPath)

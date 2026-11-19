@@ -46,7 +46,7 @@ class PageController extends Controller
 
     public function editContent(Request $request, $contentId)
     {
-        abort_unless(in_array(app(LmsAccess::class)->role($request), ['admin', 'trainer', 'teacher'], true), 403);
+        RoleAccess::assertLearningManager($request);
         $content = Content::findOrFail($contentId);
         return redirect('/course/update-contents/'.$content->course_id.'/'.$content->id);
     }

@@ -21,13 +21,14 @@ export function useAuth() {
     const isTrainer = computed(() => hasRole('trainer'));
     const isSop = computed(() => hasRole('sop'));
     const isAudit = computed(() => hasRole('audit'));
+    const isTrainee = computed(() => hasRole('trainee') || Boolean(user.value?.is_trainee));
     const isStudent = computed(() => roles.value.includes('student'));
 
     // Hak akses fungsional (multi-role checklist)
-    const canManageLearning = computed(() => hasRole(['admin', 'trainer']));
-    const canManageDocuments = computed(() => hasRole(['admin', 'sop']));
-    const canViewReports = computed(() => hasRole(['admin', 'sop', 'audit', 'trainer']));
-    const canManageQuiz = computed(() => hasRole(['admin', 'trainer']));
+    const canManageLearning = computed(() => !isTrainee.value && hasRole(['admin', 'trainer', 'sop']));
+    const canManageDocuments = computed(() => !isTrainee.value && hasRole(['admin', 'sop']));
+    const canViewReports = computed(() => !isTrainee.value && hasRole(['admin', 'sop', 'audit', 'trainer']));
+    const canManageQuiz = computed(() => !isTrainee.value && hasRole(['admin', 'trainer', 'sop']));
 
     return {
         user,
@@ -38,6 +39,7 @@ export function useAuth() {
         isTrainer,
         isSop,
         isAudit,
+        isTrainee,
         isStudent,
         canManageLearning,
         canManageDocuments,

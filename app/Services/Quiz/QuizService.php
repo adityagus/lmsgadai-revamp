@@ -14,6 +14,7 @@ class QuizService
         $user = app(EmployeeParticipants::class)->findActive($username);
         abort_unless($user, 403, 'Akun karyawan tidak aktif atau tidak ditemukan.');
         $user->role = app(\App\Services\LmsAccess::class)->role($request);
+        $user->roles = \App\Services\RoleAccess::roles($request);
         $user->position = $request->session()->get('auth.idgrup');
         $user->branch = $request->session()->get('auth.cabang');
         return $user;
@@ -21,9 +22,10 @@ class QuizService
 
     public function manage($user, $quiz = null)
     {
-        abort_unless(in_array($user->role, ['admin', 'trainer', 'teacher'], true), 403);
+        $roles = $user->roles ?? [$user->role ?? 'student'];
+        abort_unless(!empty(array_intersect($roles, ['admin', 'trainer', 'teacher', 'sop'])), 403);
         if ($quiz) {
-            abort_unless($user->role === 'admin' || $quiz->created_by === $user->id, 403);
+            abort_unless(in_array('admin', $roles, true) || $quiz->created_by === $user->id, 403);
         }
     }
 
@@ -62,11 +64,29 @@ class QuizService
         // Courses currently have no enrolment restriction: every signed-in LMS user can open them.
         // A linked quiz follows that same audience; legacy standalone quizzes keep their assignments.
         if ($quiz->course_id) {
-            return DB::table('courses')->where('id', $quiz->course_id)->exists()
-                && DB::getSchemaBuilder()->hasTable('course_details')
-                && DB::table('course_details')->where('course_id', $quiz->course_id)->where('quiz_id', $quiz->id)->where('type', 'quiz')->exists()
-                && app(\App\Services\CourseAudience::class)->allows((int) $quiz->course_id, request())
-                && DB::table('lms_users')->where('id', $student)->exists();
+            $linkedCourseIds = \Illuminate\Support\Facades\Schema::hasTable('quiz_courses')
+                ? DB::table('quiz_courses')->where('quiz_id', $quiz->id)->pluck('course_id')->map(fn ($v) => (int) $v)->all()
+                : [];
+            if (!in_array((int) $quiz->course_id, $linkedCourseIds, true)) {
+                $linkedCourseIds[] = (int) $quiz->course_id;
+            }
+            if (!DB::table('lms_users')->where('id', $student)->exists() || !DB::getSchemaBuilder()->hasTable('course_details')) {
+                return false;
+            }
+            $attachedCourseIds = DB::table('course_details')
+                ->whereIn('course_id', $linkedCourseIds)
+                ->where('quiz_id', $quiz->id)
+                ->where('type', 'quiz')
+                ->pluck('course_id')
+                ->map(fn ($v) => (int) $v)
+                ->unique()
+                ->all();
+            foreach ($attachedCourseIds as $cid) {
+                if (DB::table('courses')->where('id', $cid)->exists() && app(\App\Services\CourseAudience::class)->allows($cid, request())) {
+                    return true;
+                }
+            }
+            return false;
         }
         if (!app(QuizAudience::class)->allows($quiz->id, $user)) return false;
         return DB::table('quiz_students')->where('quiz_id', $quiz->id)->where('student_id', $student)->exists()

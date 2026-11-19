@@ -5,7 +5,7 @@
       <div>
         <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Manajemen Role Karyawan</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Atur hak akses role (Admin, Trainer, SOP, Audit) untuk karyawan.
+          Atur hak akses role (Admin, Trainer, SOP, Audit, Trainee) untuk karyawan.
         </p>
       </div>
       <div>
@@ -48,7 +48,7 @@
           Semua ({{ items.length }})
         </button>
         <button
-          v-for="role in ['admin', 'trainer', 'sop', 'audit']"
+          v-for="role in ['admin', 'trainer', 'sop', 'audit', 'trainee']"
           :key="role"
           type="button"
           @click="roleFilter = role"
@@ -387,6 +387,7 @@ const roleOptions = [
   { value: 'trainer', label: 'Trainer (Instruktur)' },
   { value: 'sop', label: 'SOP (Dokumen)' },
   { value: 'audit', label: 'Audit (Laporan)' },
+  { value: 'trainee', label: 'Trainee (Hanya Pembelajaran)' },
 ];
 
 // React Query
@@ -494,6 +495,8 @@ function getBadgeClass(role) {
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     case 'audit':
       return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'trainee':
+      return 'bg-teal-50 text-teal-700 border-teal-200';
     default:
       return 'bg-gray-50 text-gray-600 border-gray-200';
   }

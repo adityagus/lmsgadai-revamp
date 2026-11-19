@@ -58,7 +58,12 @@ import CardSkeleton from '../../components/skeletons/CardSkeleton.vue';
 
 const { courses, pagination, totalPages, loading, loaded, error, fetchCourses, goToPage } = useCourseList(getCourses);
 const auth = ref(null);
-const canManage = computed(() => ['admin', 'trainer', 'teacher'].includes(auth.value?.role));
+const canManage = computed(() => {
+  const user = auth.value;
+  if (!user) return false;
+  const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
+  return roles.some((r) => ['admin', 'trainer', 'teacher', 'sop'].includes(String(r).toLowerCase()));
+});
 
 // Fungsi untuk menghapus kursus
 const handleDelete = async (id) => {

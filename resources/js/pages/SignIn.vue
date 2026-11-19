@@ -7,7 +7,7 @@
 
         <div class="flex items-center justify-center z-1">
 
-          <!-- back to landing page (coming soon) -->
+          <!-- back to landing page (coming soon) -->asdasdasdasdas
           <div class="w-full max-w-md pt-10">
             <router-link to="/"
               class="absolute top-4 left-4 inline-flex items-center text-sm text-white transition-colors hover:text-gray-700 z-10">
@@ -72,7 +72,7 @@
                   <!-- Email -->
                   <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 ">
-                      Username<span class="text-red-500">*</span>
+                      Username 121312<span class="text-red-500">*</span>
                     </label>
                     <input type="username" id="username" name="username" placeholder="Enter your username"
                       v-model="username"

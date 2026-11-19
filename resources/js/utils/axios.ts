@@ -35,3 +35,4 @@ apiInstanceAuth.interceptors.response.use(
     (response) => response,
     handleExpired,
 );
+export default apiInstance;

@@ -37,8 +37,20 @@ class ManageQuizController extends Controller
     public function index(Request $r)
     {
         $u = $this->user($r);
-        return DB::table('quizzes')->when($u->role !== 'admin', function ($q) use ($u) {
-            $q->where('created_by', $u->id); })->orderByDesc('id')->get()->map(function ($q) { return $this->dates($q); });
+        $quizzes = DB::table('quizzes')->when($u->role !== 'admin', function ($q) use ($u) {
+            $q->where('created_by', $u->id); })->orderByDesc('id')->get();
+        $links = \Illuminate\Support\Facades\Schema::hasTable('quiz_courses') && $quizzes->isNotEmpty()
+            ? DB::table('quiz_courses')->whereIn('quiz_id', $quizzes->pluck('id'))->get()->groupBy('quiz_id')
+            : collect();
+        return $quizzes->map(function ($q) use ($links) {
+            $ids = $links->get($q->id, collect())->pluck('course_id')->map(fn ($v) => (int) $v)->all();
+            if ($q->course_id && !in_array((int) $q->course_id, $ids, true)) {
+                array_unshift($ids, (int) $q->course_id);
+            }
+            $q->course_ids = $ids;
+            return $this->dates($q);
+        });
+
     }
 
     private function dates($row)
@@ -237,6 +249,14 @@ class ManageQuizController extends Controller
         $q->overrides = DB::table('quiz_students')->where('quiz_id', $quiz)->get()->map(function ($o) { return $this->dates($o); });
         $q->has_attempts = DB::table('quiz_attempts')->where('quiz_id', $quiz)->exists();
         $q->course_locked = $q->has_attempts || (DB::getSchemaBuilder()->hasTable('course_details') && DB::table('course_details')->where('quiz_id', $quiz)->exists());
+        $q->course_locked = $q->has_attempts || (DB::getSchemaBuilder()->hasTable('course_details') && DB::table('course_details')->where('quiz_id', $quiz)->exists());
+        $courseIds = \Illuminate\Support\Facades\Schema::hasTable('quiz_courses')
+            ? DB::table('quiz_courses')->where('quiz_id', $quiz)->pluck('course_id')->map(fn ($v) => (int) $v)->all()
+            : [];
+        if ($q->course_id && !in_array((int) $q->course_id, $courseIds, true)) {
+            array_unshift($courseIds, (int) $q->course_id);
+        }
+        $q->course_ids = $courseIds;
         return $this->dates($q);
     }
 
@@ -265,7 +285,9 @@ class ManageQuizController extends Controller
             'title' => 'required|string|max:150',
             'description' => 'nullable|string|max:20000',
             'no_schedule' => 'sometimes|boolean',
-            'course_id' => 'required|integer|exists:courses,id',
+            'course_id' => 'required_without:course_ids|nullable|integer|exists:courses,id',
+            'course_ids' => 'sometimes|array|min:1',
+            'course_ids.*' => 'integer|distinct|exists:courses,id',
             'duration_minutes' => 'required|integer|min:1|max:1440',
             'passing_grade' => 'required|numeric|min:0|max:100',
             'maximum_attempt' => 'required|integer|min:0|max:100',
@@ -302,10 +324,17 @@ class ManageQuizController extends Controller
                 abort_unless($existing, 404);
                 $this->service->manage($u, $existing);
                 abort_if(DB::table('quiz_attempts')->where('quiz_id', $quiz)->exists(), 422, 'Quiz sudah dikerjakan. Gunakan pengaturan hasil/override atau duplikasi quiz.');
-                if ((int) $existing->course_id !== (int) ($data['course_id'] ?? null) && DB::getSchemaBuilder()->hasTable('course_details')) {
-                    abort_if(DB::table('course_details')->where('quiz_id', $quiz)->exists(), 422, 'Quiz sudah dipasang pada course. Lepaskan dari materi course tersebut sebelum mengganti course.');
-                }
             }
+            $courseIds = !empty($data['course_ids'])
+                ? array_values(array_unique(array_map('intval', $data['course_ids'])))
+                : (!empty($data['course_id']) ? [(int) $data['course_id']] : []);
+            $data['course_id'] = $courseIds[0] ?? null;
+            if ($quiz && DB::getSchemaBuilder()->hasTable('course_details')) {
+                $usedInCourses = DB::table('course_details')->where('quiz_id', $quiz)->pluck('course_id')->map(fn ($v) => (int) $v)->unique()->all();
+                $removed = array_diff($usedInCourses, $courseIds);
+                abort_if(!empty($removed), 422, 'Quiz sudah dipasang pada course. Lepaskan dari materi course tersebut sebelum menghapus relasi course.');
+            }
+            unset($data['course_ids']);
             $classes = [];
             $questions = $data['question_ids'];
             $overrides = $data['overrides'];
@@ -338,6 +367,16 @@ class ManageQuizController extends Controller
                 $quiz = DB::table('quizzes')->insertGetId($data + ['created_by' => $u->id, 'created_at' => now()]);
             }
             app(QuizAudience::class)->save($quiz, $audience);
+            if (\Illuminate\Support\Facades\Schema::hasTable('quiz_courses')) {
+                DB::table('quiz_courses')->where('quiz_id', $quiz)->delete();
+                foreach ($courseIds as $cid) {
+                    DB::table('quiz_courses')->insertOrIgnore([
+                        'quiz_id' => $quiz,
+                        'course_id' => $cid,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
             $explanations = DB::table('quiz_questions')->where('quiz_id', $quiz)->pluck('explanation', 'question_id');
             foreach (['quiz_classes', 'quiz_questions', 'quiz_students'] as $table) {
                 DB::table($table)->where('quiz_id', $quiz)->delete();
@@ -407,6 +446,16 @@ class ManageQuizController extends Controller
             DB::table('quizzes')->where('id', $quiz)->update($data + ['updated_at' => now()]);
             foreach ($overrides as $override) { $this->storeOverride($quiz, $override); }
             app(QuizAudience::class)->save($quiz, $audience);
+            if (\Illuminate\Support\Facades\Schema::hasTable('quiz_courses')) {
+                DB::table('quiz_courses')->where('quiz_id', $quiz)->delete();
+                foreach ($courseIds as $cid) {
+                    DB::table('quiz_courses')->insertOrIgnore([
+                        'quiz_id' => $quiz,
+                        'course_id' => $cid,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
             return ['message' => 'Pengaturan diperbarui.'];
         }, 3);
     }

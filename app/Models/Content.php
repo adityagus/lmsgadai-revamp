@@ -13,7 +13,7 @@ class Content extends Model
     protected $table = 'course_details';
     
     protected $fillable = [
-      'course_id', 'title', 'lampiran', 'type', 'content', 'order', 'created_by', 'updated_by', 'quiz_id'
+      'course_id', 'parent_id', 'title', 'lampiran', 'type', 'content', 'order', 'created_by', 'updated_by', 'quiz_id'
     ];
     
     protected $casts = [
@@ -58,6 +58,16 @@ class Content extends Model
     public function course()
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(Content::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(Content::class, 'parent_id')->orderBy('order', 'asc')->orderBy('id', 'asc');
     }
 
     public function user()

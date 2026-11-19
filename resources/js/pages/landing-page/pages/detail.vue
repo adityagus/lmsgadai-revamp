@@ -173,6 +173,7 @@ const getContentIcon = (type) => {
     case 'text':
       return '/assets/images/icons/note-white.svg';
     case 'pdf':
+    case 'dokumen':
       return '/assets/images/icons/pdf-white.svg';
     case 'finished':
       return '';

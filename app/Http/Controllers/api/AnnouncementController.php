@@ -17,7 +17,7 @@ class AnnouncementController extends Controller
 {
     private function authorizeDocumentMutation(): void
     {
-        abort_unless(in_array(app(\App\Services\LmsAccess::class)->role(request()), ['admin', 'sop'], true), 403);
+        \App\Services\RoleAccess::assertDocumentManager(request());
     }
 
     /**

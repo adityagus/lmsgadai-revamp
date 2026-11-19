@@ -14,7 +14,7 @@ class CourseProgressController extends Controller
     private function contents(Request $request, int $id)
     {
         app(CourseAudience::class)->assertAllowed($id, $request);
-        return Course::findOrFail($id)->contents()->orderBy('order')->orderBy('id')->get();
+        return Course::findOrFail($id)->contents()->where('type', '!=', 'parent')->orderBy('order')->orderBy('id')->get();
     }
 
     private function snapshot(Request $request, int $id, $contents): array

@@ -18,12 +18,11 @@ class RequirePosition
         }
 
         $position = $request->session()->get('auth.idgrup');
-        $role = app(LmsAccess::class)->role($request);
         $groups = config('access.groups', []);
 
         foreach ($allowed as $requirement) {
             if (isset($groups[$requirement])) {
-                if (in_array($role, $groups[$requirement], true)) {
+                if (\App\Services\RoleAccess::hasRole($groups[$requirement], $request)) {
                     return $next($request);
                 }
             } elseif ($requirement !== '' && is_string($position) && $position === $requirement) {

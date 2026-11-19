@@ -314,16 +314,13 @@ const filteredCards = computed(() => {
 
 const search = ref('');
 
-const isAdmin = computed(() =>
-  auth.value &&
-  (
-    ['admin', 'sop'].includes(auth.value.role)
-  )
-);
+const isAdmin = computed(() => {
+  if (!auth.value) return false;
+  const roles = Array.isArray(auth.value.roles) && auth.value.roles.length ? auth.value.roles : [auth.value.role];
+  return roles.some((r) => ['admin', 'sop'].includes(String(r).toLowerCase()));
+});
 
-const canManageDocuments = computed(() =>
-  isAdmin.value && !['JBT-019', 'JBT-020'].includes(auth.value?.idgrup)
-);
+const canManageDocuments = computed(() => isAdmin.value);
 
 const tableCols = computed(() => {
   const cols = [

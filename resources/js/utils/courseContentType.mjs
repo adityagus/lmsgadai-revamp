@@ -16,5 +16,6 @@ export function courseContentType(content) {
     if (['form', 'google_form', 'google form'].includes(content?.type)) return 'google_form';
     // Legacy Google Forms used type=quiz. Unconfigured native quizzes must never load an iframe.
     if (content?.type === 'quiz' && googleFormUrl(content)) return 'google_form';
+    if (content?.type === 'pdf' || content?.type === 'dokumen') return 'dokumen';
     return content?.type || '';
 }

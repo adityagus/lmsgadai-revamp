@@ -6,57 +6,59 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreContentRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('type') === 'pdf') {
+            $this->merge(['type' => 'dokumen']);
+        }
+    }
+
     public function rules()
     {
+        $allowedExt = ['pdf', 'ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx'];
+
         return [
             'course_id' => 'required|integer|exists:courses,id',
+            'parent_id' => 'nullable|integer',
+            'new_parent_title' => 'nullable|string|max:150',
             'quiz_id' => 'nullable|integer|exists:quizzes,id',
             'title' => 'required|string|max:150',
-            'type' => 'required|string|in:text,video,pdf,quiz,form,google_form',
-            // Jika type pdf, content harus file pdf. Jika bukan, content string (nullable)
+            'type' => 'required|string|in:text,video,dokumen,pdf,quiz,form,google_form,parent',
             'content' => [
                 'nullable',
-                function ($attribute, $value, $fail) {
+                function ($attribute, $value, $fail) use ($allowedExt) {
                     $type = request('type');
-                    if ($type === 'pdf') {
+                    if (in_array($type, ['dokumen', 'pdf'], true)) {
                         if (!request()->hasFile('content')) {
-                            $fail('Content harus berupa file PDF jika type adalah pdf.');
-                        } else {
-                            $file = request()->file('content');
-                            if ($file->getClientOriginalExtension() !== 'pdf') {
-                                $fail('File harus berformat PDF.');
-                            }
+                            $fail('File dokumen wajib diunggah.');
+                            return;
+                        }
+                        $file = request()->file('content');
+                        $ext = strtolower((string) ($file->getClientOriginalExtension() ?: $file->guessExtension()));
+                        if (!in_array($ext, $allowedExt, true)) {
+                            $fail('Format yang didukung: PDF, PPT, PPTX, DOCX, Excel (Maks. 5MB).');
+                            return;
+                        }
+                        if ($file->getSize() > 5 * 1024 * 1024) {
+                            $fail('Ukuran file maksimal 5MB.');
                         }
                     } else {
-                        // Untuk selain pdf, harus string jika diisi
                         if ($value !== null && !is_string($value)) {
                             $fail('Content harus berupa string.');
                         }
                     }
                 }
             ],
-            'lampiran' => 'nullable|file|mimes:pdf|max:2048',
-            'order' => 'required|integer|min:1', // Order required for create
-            // 'created_by' => 'required|integer|exists:users,id',
-            // 'updated_by' => 'nullable|integer|exists:users,id',
+            'lampiran' => 'nullable|file|mimes:pdf,ppt,pptx,doc,docx,xls,xlsx|max:5120',
+            'order' => 'required|integer|min:1',
         ];
     }
-    
+
     public function messages()
     {
         return [
@@ -66,7 +68,9 @@ class StoreContentRequest extends FormRequest
             'title.required' => 'Judul wajib diisi.',
             'title.max' => 'Judul maksimal 150 karakter.',
             'type.required' => 'Content type is required.',
-            'type.in' => 'Content type must be one of: text, video, pdf, quiz, form, google_form.',
+            'type.in' => 'Content type must be one of: text, video, dokumen, quiz, form, google_form, parent.',
+            'lampiran.mimes' => 'Format yang didukung: PDF, PPT, PPTX, DOCX, Excel (Maks. 5MB).',
+            'lampiran.max' => 'Ukuran file lampiran maksimal 5MB.',
             'order.required' => 'Order is required.',
             'order.integer' => 'Order must be a number.',
             'order.min' => 'Order must be at least 1.',

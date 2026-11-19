@@ -37,7 +37,7 @@ class CourseSequence
 
     public function isUnlocked(int $courseId, int $contentId, string $username): bool
     {
-        $contents = Content::where('course_id', $courseId)->orderBy('order')->orderBy('id')->get();
+        $contents = Content::where('course_id', $courseId)->where('type', '!=', 'parent')->orderBy('order')->orderBy('id')->get();
         if (!$contents->contains('id', $contentId)) return false;
         $completed = $this->completed($contents, $courseId, $username);
         if (isset($completed[$contentId])) return true;

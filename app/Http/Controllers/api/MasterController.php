@@ -106,10 +106,26 @@ class MasterController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'required|string|max:500',
+            'description' => 'nullable|string|max:255',
         ]);
 
-        $category = Category::create($validated);
+        $payload = [
+            'name' => trim($validated['name']),
+            'description' => trim((string) ($validated['description'] ?? '')),
+        ];
+
+        $nextId = (int) (\Illuminate\Support\Facades\DB::table('categories')->max('id') ?? 0) + 1;
+        $payload['id'] = $nextId;
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('categories', 'courses')) {
+            $payload['courses'] = '';
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('categories', 'update_at')) {
+            $payload['update_at'] = now();
+        }
+
+        \Illuminate\Support\Facades\DB::table('categories')->insert($payload);
+        $category = \Illuminate\Support\Facades\DB::table('categories')->where('id', $nextId)->first();
 
         return response()->json([
             'message' => 'Category created successfully',
@@ -128,19 +144,37 @@ class MasterController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'required|string|max:500',
+            'description' => 'nullable|string|max:255',
         ]);
 
-        $category = Category::find($id);
+        $category = \Illuminate\Support\Facades\DB::table('categories')->where('id', $id)->first();
         if (!$category) {
             return response()->json(['message' => 'Category not found'], 404);
         }
 
-        $category->update($validated);
+        $payload = [
+            'name' => trim($validated['name']),
+            'description' => trim((string) ($validated['description'] ?? '')),
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('categories', 'update_at')) {
+            $payload['update_at'] = now();
+        }
+
+        \Illuminate\Support\Facades\DB::table('categories')->where('id', $id)->update($payload);
+        $updated = \Illuminate\Support\Facades\DB::table('categories')->where('id', $id)->first();
 
         return response()->json([
             'message' => 'Category updated successfully',
-            'category' => $category
+            'category' => $updated
         ], 200);
+    }
+
+    public function deleteCategory($id)
+    {
+        $deleted = \Illuminate\Support\Facades\DB::table('categories')->where('id', $id)->delete();
+        if (!$deleted) {
+            return response()->json(['message' => 'Category not found'], 404);
+        }
+        return response()->json(['message' => 'Category deleted successfully']);
     }
 }

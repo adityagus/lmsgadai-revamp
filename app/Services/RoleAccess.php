@@ -13,13 +13,14 @@ use Throwable;
  */
 class RoleAccess
 {
-    public const VALID_ROLES = ['admin', 'sop', 'trainer', 'audit', 'student'];
+    public const VALID_ROLES = ['admin', 'sop', 'trainer', 'audit', 'trainee', 'student'];
 
     public const ROLE_PRIORITIES = [
         'admin' => 100,
         'trainer' => 80,
         'sop' => 70,
         'audit' => 60,
+        'trainee' => 20,
         'student' => 10,
     ];
 
@@ -49,18 +50,24 @@ class RoleAccess
 
     public static function rolesForUser(?string $username, ?string $position = null): array
     {
+        $fallbackRole = static::roleForPosition($position);
         $username = strtolower(trim((string) $username));
         if ($username !== '') {
             $userRoleRecords = static::allUserRoleRecords();
             if (isset($userRoleRecords[$username])) {
                 $assigned = $userRoleRecords[$username];
                 if (!empty($assigned)) {
-                    return $assigned;
+                    if (in_array('trainee', $assigned, true)) {
+                        return ['trainee'];
+                    }
+                    if ($fallbackRole !== 'student' && !in_array($fallbackRole, $assigned, true)) {
+                        $assigned[] = $fallbackRole;
+                    }
+                    return array_values(array_unique($assigned));
                 }
             }
         }
 
-        $fallbackRole = static::roleForPosition($position);
         return [$fallbackRole];
     }
 
@@ -208,6 +215,15 @@ class RoleAccess
     {
         $request ??= request();
         $auth = $request->session()->get('auth', []);
+        if (($auth['status'] ?? null) !== 'login' || empty($auth['user'])) {
+            return false;
+        }
+        if (static::hasRole('trainee', $request)) {
+            return true;
+        }
+        if (static::hasRole(['admin', 'trainer', 'sop', 'audit'], $request)) {
+            return false;
+        }
         $position = strtoupper(trim((string) ($auth['idgrup'] ?? '')));
         return $position === 'JBT-053' || str_starts_with($position, 'JBT-053');
     }
@@ -219,12 +235,12 @@ class RoleAccess
 
     public static function canManageLearning(?Request $request = null): bool
     {
-        return static::hasRole(['admin', 'trainer'], $request);
+        return static::hasRole(['admin', 'trainer', 'sop'], $request);
     }
 
     public static function isManager(?Request $request = null): bool
     {
-        return static::hasRole(['admin', 'trainer'], $request);
+        return static::hasRole(['admin', 'trainer', 'sop'], $request);
     }
 
     public static function assertAdmin(?Request $request = null): void

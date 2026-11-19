@@ -2,12 +2,13 @@
 import Header from "@/components/Header.vue";
 import ContentVideo from "./ContentVideo.vue";
 import ContentText from "./ContentText.vue";
-import ContentPdf from "./ContentPdf.vue";
+import ContentDocument from "./ContentDocument.vue";
 import ContentForm from "./ContentForm.vue";
 import ContentQuiz from "./ContentQuiz.vue";
 import { courseContentType } from "@/utils/courseContentType.mjs";
 import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "@/navigation";
+import { usePage } from "@inertiajs/vue3";
 import { getCourseById } from "@/services/queries/courseQuery.ts";
 import Swal from "sweetalert2";
 import { getCourseProgress } from "@/services/queries/courseProgressQuery.ts";
@@ -43,17 +44,140 @@ const completedLabel = (id) =>
     `Selesai: ${new Date(completedAt(id)).toLocaleString("id-ID")}`;
 const isContentCompleted = (id) => Boolean(completedAt(id));
 const nextIncompleteIndex = computed(() =>
-    contents.value.findIndex((item) => !isContentCompleted(item.id)),
+    contents.value.findIndex((item) => item.type !== 'parent' && !isContentCompleted(item.id)),
 );
+const page = usePage();
+const isManager = computed(() => {
+    const role = page.props.auth?.role;
+    const roles = page.props.auth?.roles || [];
+    const idgrup = page.props.auth?.idgrup;
+    return ['admin', 'trainer', 'teacher'].includes(role) ||
+        roles.some(r => ['admin', 'trainer', 'teacher'].includes(r)) ||
+        ['JBT-032', 'JBT-038', 'JBT-019', '042'].includes(idgrup);
+});
+
 const canOpenContent = (index) => {
+    const target = contents.value[index];
+    if (!target || target.type === 'parent') return false;
     return (
         index >= 0 &&
         index < contents.value.length &&
-        (route.name === "content-admin-preview" ||
+        (isManager.value ||
+            route.name === "content-admin-preview" ||
             index === nextIncompleteIndex.value ||
             isContentCompleted(contents.value[index]?.id))
     );
 };
+const contentSections = computed(() => {
+    if (!contents.value.length) return [];
+
+    const explicitParents = contents.value.filter(c => c.type === 'parent');
+    const childContents = contents.value.filter(c => c.type !== 'parent');
+    const hasAnyParent = explicitParents.length > 0 || childContents.some(c => c.parent_id);
+
+    if (!hasAnyParent) {
+        return [
+            {
+                id: 'default',
+                title: 'Materi Pembelajaran',
+                items: childContents.map((c) => ({
+                    ...c,
+                    originalIndex: contents.value.findIndex(item => item.id === c.id),
+                })),
+            }
+        ];
+    }
+
+    const parentMap = new Map();
+    explicitParents.forEach(p => {
+        parentMap.set(String(p.id), {
+            id: String(p.id),
+            title: p.title,
+            items: [],
+        });
+    });
+
+    const unassignedItems = [];
+
+    childContents.forEach((c) => {
+        const originalIdx = contents.value.findIndex(item => item.id === c.id);
+        const itemWithIdx = { ...c, originalIndex: originalIdx };
+        const pId = c.parent_id ? String(c.parent_id) : null;
+
+        if (pId && parentMap.has(pId)) {
+            parentMap.get(pId).items.push(itemWithIdx);
+        } else if (pId) {
+            const parentObj = contents.value.find(item => String(item.id) === pId);
+            if (parentObj) {
+                if (!parentMap.has(pId)) {
+                    parentMap.set(pId, {
+                        id: pId,
+                        title: parentObj.title,
+                        items: [],
+                    });
+                }
+                parentMap.get(pId).items.push(itemWithIdx);
+            } else {
+                unassignedItems.push(itemWithIdx);
+            }
+        } else {
+            unassignedItems.push(itemWithIdx);
+        }
+    });
+
+    const sections = Array.from(parentMap.values());
+    if (unassignedItems.length > 0) {
+        sections.unshift({
+            id: 'unassigned',
+            title: sections.length > 0 ? 'Materi Utama' : 'Materi Pembelajaran',
+            items: unassignedItems,
+        });
+    }
+
+    return sections;
+});
+
+const openSections = ref(new Set());
+
+function toggleSection(id) {
+    if (openSections.value.has(id)) {
+        openSections.value.delete(id);
+    } else {
+        openSections.value.add(id);
+    }
+}
+
+function isSectionOpen(id) {
+    return openSections.value.has(id);
+}
+
+const sectionCompletedCount = (sec) => {
+    return sec.items.filter(item => isContentCompleted(item.id)).length;
+};
+
+watch(
+    currentContentIndex,
+    (idx) => {
+        const activeItem = contents.value[idx];
+        if (!activeItem) return;
+        const activeSec = contentSections.value.find(s => s.items.some(item => item.id === activeItem.id));
+        if (activeSec) {
+            openSections.value.add(activeSec.id);
+        }
+    },
+    { immediate: true }
+);
+
+watch(
+    contentSections,
+    (secs) => {
+        if (secs.length > 0 && openSections.value.size === 0) {
+            secs.forEach(s => openSections.value.add(s.id));
+        }
+    },
+    { immediate: true }
+);
+
 const isCurrentFormSubmitted = ref(false);
 const isMobileSidebarOpen = ref(false);
 
@@ -66,9 +190,12 @@ const courseId = computed(() => {
     );
     return match?.[1] || null;
 });
-const currentContent = computed(
-    () => contents.value[currentContentIndex.value] || {},
-);
+const currentContent = computed(() => {
+    const item = contents.value[currentContentIndex.value];
+    if (item && item.type !== 'parent') return item;
+    const firstPlayable = contents.value.find(c => c.type !== 'parent');
+    return firstPlayable || item || {};
+});
 const isLastContent = computed(
     () => currentContentIndex.value === contents.value.length - 1,
 );
@@ -163,14 +290,21 @@ const fetchCourseData = async () => {
             );
             progress.value = savedProgress;
             const resume = contents.value.findIndex(
-                (item) => !completedAt(item.id),
+                (item) => item.type !== 'parent' && !completedAt(item.id),
             );
-            currentContentIndex.value =
-                route.name === "content-admin-preview" && requested >= 0
-                    ? requested
-                    : resume >= 0
-                      ? resume
-                      : Math.max(0, contents.value.length - 1);
+            const firstPlayable = contents.value.findIndex(
+                (item) => item.type !== 'parent',
+            );
+
+            let targetIndex = 0;
+            if (route.name === "content-admin-preview" && requested >= 0 && contents.value[requested]?.type !== 'parent') {
+                targetIndex = requested;
+            } else if (resume >= 0) {
+                targetIndex = resume;
+            } else if (firstPlayable >= 0) {
+                targetIndex = firstPlayable;
+            }
+            currentContentIndex.value = targetIndex;
             isCurrentFormSubmitted.value = false;
         } else {
             throw new Error(response.message || "Failed to fetch course data");
@@ -211,18 +345,25 @@ const markAsCompleted = () => {
             if (request !== courseRequest) return;
             progress.value = saved;
             if (saved.is_complete) {
-                Swal.fire({
-                    title: "Selamat!",
-                    text: "Seluruh materi kelas telah selesai. Progres Anda tersimpan.",
-                    icon: "success",
-                    confirmButtonColor: "#662FFF",
-                });
+                isCurrentFormSubmitted.value = false;
+                if (route.name !== "content-admin-preview") {
+                    router.push(`/student/kelas/${courseId.value}/selesai`);
+                } else {
+                    Swal.fire({
+                        title: "Selamat!",
+                        text: "Seluruh materi kelas telah selesai. Progres Anda tersimpan.",
+                        icon: "success",
+                        confirmButtonColor: "#662FFF",
+                    });
+                }
             } else {
                 isCurrentFormSubmitted.value = false;
                 const next = contents.value.findIndex(
-                    (item) => !completedAt(item.id),
+                    (item) => item.type !== 'parent' && !completedAt(item.id),
                 );
-                currentContentIndex.value = Math.max(0, next);
+                if (next >= 0) {
+                    currentContentIndex.value = next;
+                }
             }
         } catch (err) {
             if (request !== courseRequest) return;
@@ -247,6 +388,7 @@ const getContentIcon = (type) => {
         case "text":
             return "/assets/images/icons/note-white.svg";
         case "pdf":
+        case "dokumen":
             return "/assets/images/icons/pdf-white.svg";
         case "form":
         case "google_form":
@@ -300,8 +442,14 @@ watch(courseId, (newId, oldId) => {
 watch(
     contents,
     (newContents) => {
-        if (newContents.length > 0 && currentContentIndex.value === 0) {
-            currentContentIndex.value = 0;
+        if (newContents.length > 0) {
+            const currentItem = newContents[currentContentIndex.value];
+            if (!currentItem || currentItem.type === 'parent') {
+                const firstPlayable = newContents.findIndex(c => c.type !== 'parent');
+                if (firstPlayable >= 0) {
+                    currentContentIndex.value = firstPlayable;
+                }
+            }
         }
     },
     { immediate: true },
@@ -431,100 +579,108 @@ watch(
                             </h2>
                         </div>
 
-                        <div
-                            class="text-white text-sm space-y-2"
-                            aria-live="polite"
-                        >
-                            <div class="flex justify-between">
-                                <p class="">
-                                    {{ progress.completed_count }} dari
-                                    {{ progress.total }}
-                                </p>
-                                <span class="">{{ progressPercent }}%</span>
-                            </div>
+                        <!-- Course Contents (Accordion per Bab/Parent) -->
+                        <div class="flex flex-col gap-3" v-if="contents.length > 0">
                             <div
-                                class="h-2 rounded-full bg-gray-700 overflow-hidden"
-                                role="progressbar"
-                                :aria-valuenow="progressPercent"
-                                aria-valuemin="0"
-                                aria-valuemax="100"
-                                aria-label="Progres pembelajaran"
+                                v-for="section in contentSections"
+                                :key="section.id"
+                                class="rounded-[18px] border border-[#24283E] bg-[#070B24] overflow-hidden transition-all duration-300"
                             >
-                                <div
-                                    class="h-full bg-[#7F33FF] transition-all"
-                                    :style="{ width: progressPercent + '%' }"
-                                ></div>
-                            </div>
-                        </div>
-
-                        <!-- Course Contents -->
-                        <ul
-                            class="flex flex-col gap-3 sm:gap-4"
-                            v-if="contents.length > 0"
-                        >
-                            <li
-                                v-for="(content, index) in contents"
-                                :key="content.id"
-                            >
+                                <!-- Accordion Header -->
                                 <button
-                                    @click="goToContent(index)"
-                                    :disabled="!canOpenContent(index)"
-                                    class="w-full text-left disabled:cursor-not-allowed"
-                                    :class="{
-                                        'opacity-50': !canOpenContent(index),
-                                    }"
-                                    :title="
-                                        canOpenContent(index)
-                                            ? content.title
-                                            : 'Perpindahan materi hanya melalui penyelesaian langkah aktif'
-                                    "
-                                    :aria-current="
-                                        index === currentContentIndex
-                                            ? 'step'
-                                            : undefined
-                                    "
+                                    type="button"
+                                    @click="toggleSection(section.id)"
+                                    class="flex items-center justify-between w-full p-3 sm:p-3.5 text-left font-semibold text-white hover:bg-white/5 transition-colors gap-2 cursor-pointer"
                                 >
-                                    <div
-                                        class="flex items-center gap-3 w-full rounded-full border p-3 sm:p-[14px_20px] transition-all duration-300 hover:bg-[#662FFF] hover:border-[#8661EE] hover:shadow-[-10px_-6px_10px_0_#7F33FF_inset]"
-                                        :class="{
-                                            'bg-[#662FFF] border-[#8661EE] shadow-[-10px_-6px_10px_0_#7F33FF_inset]':
-                                                index === currentContentIndex,
-                                            'bg-[#070B24] border-[#24283E] shadow-[-10px_-6px_10px_0_#181A35_inset]':
-                                                index !== currentContentIndex,
-                                        }"
-                                    >
-                                        <img
-                                            :src="getContentIcon(content.type)"
-                                            class="w-5 h-5 sm:w-6 sm:h-6 shrink-0"
-                                            alt="icon"
-                                        />
-                                        <span
-                                            class="w-full font-semibold text-white text-xs sm:text-sm line-clamp-1 transition-all duration-300 hover:line-clamp-none"
-                                        >
-                                            {{ content.title }}
-                                        </span>
-                                        <span
-                                            v-if="!canOpenContent(index)"
-                                            class="shrink-0 text-white text-xs"
-                                            aria-label="Terkunci"
-                                            >🔒</span
-                                        >
-                                        <span
-                                            v-if="completedAt(content.id)"
-                                            class="shrink-0 text-green-300 font-bold"
-                                            :title="completedLabel(content.id)"
-                                            aria-label="Materi selesai"
-                                        >
-                                            <img
-                                                src="/assets/images/icons/checklist.svg"
-                                                alt="check"
-                                                width="20px"
-                                            />
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i
+                                            class="pi text-xs text-[#7F33FF] shrink-0 transition-transform duration-200"
+                                            :class="isSectionOpen(section.id) ? 'pi-chevron-down' : 'pi-chevron-right'"
+                                        ></i>
+                                        <span class="text-xs sm:text-sm font-bold truncate text-white">
+                                            {{ section.title }}
                                         </span>
                                     </div>
+                                    <span class="text-[11px] font-semibold text-purple-300 bg-white/10 px-2.5 py-0.5 rounded-full shrink-0">
+                                        {{ sectionCompletedCount(section) }}/{{ section.items.length }}
+                                    </span>
                                 </button>
-                            </li>
-                        </ul>
+
+                                <!-- Accordion Items -->
+                                <div
+                                    v-show="isSectionOpen(section.id)"
+                                    class="px-2.5 pb-2.5 pt-1 border-t border-[#181A35] flex flex-col gap-2"
+                                >
+                                    <div
+                                        v-for="content in section.items"
+                                        :key="content.id"
+                                    >
+                                        <button
+                                            @click="goToContent(content.originalIndex)"
+                                            :disabled="!canOpenContent(content.originalIndex)"
+                                            class="w-full text-left disabled:cursor-not-allowed cursor-pointer"
+                                            :class="{
+                                                'opacity-50': !canOpenContent(content.originalIndex),
+                                            }"
+                                            :title="
+                                                canOpenContent(content.originalIndex)
+                                                    ? content.title
+                                                    : 'Perpindahan materi hanya melalui penyelesaian langkah aktif'
+                                            "
+                                            :aria-current="
+                                                content.originalIndex === currentContentIndex
+                                                    ? 'step'
+                                                    : undefined
+                                            "
+                                        >
+                                            <div
+                                                class="flex items-center gap-2.5 w-full rounded-xl border p-2.5 sm:p-3 transition-all duration-300 hover:bg-[#662FFF] hover:border-[#8661EE] hover:shadow-[-10px_-6px_10px_0_#7F33FF_inset]"
+                                                :class="{
+                                                    'bg-[#662FFF] border-[#8661EE] shadow-[-10px_-6px_10px_0_#7F33FF_inset]':
+                                                        content.originalIndex === currentContentIndex,
+                                                    'bg-[#0C1033] border-[#24283E]':
+                                                        content.originalIndex !== currentContentIndex,
+                                                }"
+                                            >
+                                                <img
+                                                    :src="getContentIcon(content.type)"
+                                                    class="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
+                                                    alt="icon"
+                                                />
+                                                <span
+                                                    class="w-full font-medium text-white text-xs line-clamp-1 transition-all duration-300 hover:line-clamp-none"
+                                                >
+                                                    {{ content.title }}
+                                                </span>
+                                                <span
+                                                    v-if="!canOpenContent(content.originalIndex)"
+                                                    class="shrink-0 text-white text-xs"
+                                                    aria-label="Terkunci"
+                                                >🔒</span>
+                                                <span
+                                                    v-if="completedAt(content.id)"
+                                                    class="shrink-0 text-green-300 font-bold"
+                                                    :title="completedLabel(content.id)"
+                                                    aria-label="Materi selesai"
+                                                >
+                                                    <img
+                                                        src="/assets/images/icons/checklist.svg"
+                                                        alt="check"
+                                                        width="16px"
+                                                    />
+                                                </span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <p
+                                        v-if="!section.items.length"
+                                        class="text-xs text-gray-500 italic p-2 text-center"
+                                    >
+                                        Belum ada materi di bab ini.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Empty State -->
                         <div v-else class="text-center py-8">
@@ -595,26 +751,30 @@ watch(
                 </div>
 
                 <div
-                    class="relative flex flex-col gap-4 sm:gap-[26px]"
+                    class="relative flex flex-col gap-4 sm:gap-6"
                     v-if="currentContent.id"
                 >
-                    <div
-                        class="text-sm text-gray-600 flex flex-wrap gap-2"
-                        aria-live="polite"
-                    >
-                        <span
-                            >Progres: {{ progress.completed_count }}/{{
-                                progress.total
-                            }}
-                            materi selesai</span
+                    <!-- Top Back & Context Bar -->
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button
+                            type="button"
+                            @click="goBack"
+                            class="inline-flex items-center gap-2 rounded-full border border-[#CFDBEF] bg-white hover:bg-gray-50 px-4 py-2 text-xs sm:text-sm font-semibold text-[#060A23] transition-colors cursor-pointer shadow-2xs"
                         >
-                        <span
-                            v-if="completedAt(currentContent.id)"
-                            class="text-green-700 font-semibold"
-                            >✓ {{ completedLabel(currentContent.id) }}</span
+                            <i class="pi pi-arrow-left text-xs"></i>
+                            <span>{{ route.name === 'content-admin-preview' ? 'Kembali ke Detail Kelas' : 'Kembali ke Daftar Kelas' }}</span>
+                        </button>
+                        <RouterLink
+                            v-if="progress.is_complete && route.name !== 'content-admin-preview'"
+                            :to="`/student/kelas/${courseId}/selesai`"
+                            class="inline-flex items-center gap-1.5 rounded-full bg-[#662FFF] hover:bg-[#5422DB] text-white px-4 py-2 text-xs sm:text-sm font-semibold transition-colors"
                         >
+                            Lihat Halaman Selesai &amp; Sertifikat
+                        </RouterLink>
                     </div>
-                    <!-- Dynamic Content Rendering -->
+
+                    <!-- Dynamic Content Rendering Card -->
+                    <div class="rounded-[22px] border border-[#E6ECF5] bg-white p-4 sm:p-6 shadow-xs">
                     <ContentText
                         v-if="currentContent.type === 'text'"
                         :content="currentContent"
@@ -623,9 +783,10 @@ watch(
                         v-else-if="currentContent.type === 'video'"
                         :content="currentContent"
                     />
-                    <ContentPdf
-                        v-else-if="currentContent.type === 'pdf'"
+                    <ContentDocument
+                        v-else-if="currentContent.type === 'dokumen' || currentContent.type === 'pdf'"
                         :content="currentContent.content"
+                        :title="currentContent.title"
                     />
                     <ContentQuiz
                         v-else-if="courseContentType(currentContent) === 'quiz'"
@@ -639,6 +800,7 @@ watch(
                         :content="currentContent"
                         @form-submitted-change="handleFormSubmittedChange"
                     />
+                    </div>
 
                     <!-- Action Button Sticky Footer Bar -->
                     <div
@@ -658,7 +820,7 @@ watch(
                                 >✓ Pembelajaran selesai</span
                             >
                             <span v-else-if="!isLastContent"
-                                >Mark as Completed & Continue</span
+                                >Tandai Selesai &amp; Lanjutkan</span
                             >
                             <span v-else>Tandai Materi Selesai</span>
                         </button>

@@ -28,7 +28,7 @@
       </div>
 
       <!-- Main Statistics Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
           <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,6 +72,23 @@
             <span v-else class="text-2xl font-bold text-gray-900">{{ totalClicks }}</span>
           </div>
         </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+          <div class="p-3 bg-sky-50 text-sky-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <div class="flex-grow">
+            <span class="block text-sm text-gray-400 font-medium">Total Terunduh</span>
+            <span v-if="loading" class="block h-7 w-16 bg-gray-200 rounded animate-pulse mt-1"></span>
+            <template v-else>
+              <span class="text-2xl font-bold text-gray-900">{{ totalDownloads }}</span>
+              <span class="block text-[11px] text-gray-400">{{ totalUniqueDownloaders }} Pengunduh Unik</span>
+            </template>
+          </div>
+        </div>
       </div>
 
       <!-- Search, Sort & Rows Per Page Filters -->
@@ -113,6 +130,8 @@
               <option value="readers_asc">Tersedikit Dibaca</option>
               <option value="clicks_desc">Terbanyak Diklik</option>
               <option value="clicks_asc">Tersedikit Diklik</option>
+              <option value="downloads_desc">Terbanyak Diunduh</option>
+              <option value="downloads_asc">Tersedikit Diunduh</option>
             </select>
           </div>
 
@@ -121,7 +140,77 @@
 
       <!-- Stats Table Card -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="overflow-x-auto">
+        <!-- Mobile Card View (per row) -->
+        <div class="md:hidden p-3 space-y-3 bg-gray-50/40" :aria-busy="loading">
+          <template v-if="loading">
+            <div v-for="i in perPage" :key="'m-skeleton-' + i"
+              class="bg-white rounded-xl border border-gray-100 p-4 space-y-3 animate-pulse shadow-xs">
+              <div class="h-4 w-3/4 bg-gray-200 rounded"></div>
+              <div class="h-3 w-1/2 bg-gray-100 rounded"></div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="h-10 bg-gray-100 rounded-lg"></div>
+                <div class="h-10 bg-gray-100 rounded-lg"></div>
+                <div class="h-10 bg-gray-100 rounded-lg"></div>
+              </div>
+              <div class="h-9 bg-gray-200 rounded-lg"></div>
+            </div>
+          </template>
+
+          <div v-else-if="error" class="bg-white rounded-xl border border-gray-100 p-6 text-center">
+            <p role="alert" class="text-sm text-red-600">{{ error }}</p>
+            <button type="button" @click="fetchStats"
+              class="mt-3 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+              Coba lagi
+            </button>
+          </div>
+
+          <template v-else-if="paginatedStats.length > 0">
+            <article v-for="(item, idx) in paginatedStats" :key="'m-' + item.document_id"
+              class="bg-white rounded-xl border border-gray-100 p-4 space-y-3 shadow-xs">
+              <div class="flex items-start gap-2.5">
+                <span
+                  class="shrink-0 w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center">
+                  {{ startRow + idx }}
+                </span>
+                <div class="min-w-0 flex-1">
+                  <h3 class="font-semibold text-gray-900 text-sm leading-snug break-words">{{ item.document_title }}</h3>
+                  <p class="text-xs text-gray-400 mt-0.5 break-words">No. Surat: {{ item.document_no_surat || '-' }}</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="rounded-lg bg-green-50/70 border border-green-100 px-2 py-2">
+                  <span class="block text-[10px] font-medium text-green-700 uppercase">Dibaca</span>
+                  <span class="block text-xs font-bold text-green-800 mt-0.5">{{ item.total_users_read }} Org</span>
+                </div>
+                <div class="rounded-lg bg-sky-50/70 border border-sky-100 px-2 py-2">
+                  <span class="block text-[10px] font-medium text-sky-700 uppercase">Terunduh</span>
+                  <span class="block text-xs font-bold text-sky-800 mt-0.5">{{ item.total_downloads ?? 0 }}x ({{ item.total_users_downloaded ?? 0 }})</span>
+                </div>
+                <div class="rounded-lg bg-purple-50/70 border border-purple-100 px-2 py-2">
+                  <span class="block text-[10px] font-medium text-purple-700 uppercase">Klik</span>
+                  <span class="block text-xs font-bold text-purple-800 mt-0.5">{{ item.total_clicks }}x</span>
+                </div>
+              </div>
+
+              <button @click="showDetail(item)"
+                class="w-full inline-flex items-center justify-center px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition duration-150 gap-1.5 border border-indigo-100 cursor-pointer">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                Detail Keterbacaan
+              </button>
+            </article>
+          </template>
+
+          <div v-else class="bg-white rounded-xl border border-gray-100 py-10 text-center text-gray-400">
+            <p class="text-sm font-medium">Dokumen tidak ditemukan</p>
+          </div>
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden md:block overflow-x-auto">
           <table class="w-full min-w-[760px] table-fixed border-collapse" :aria-busy="loading">
             <thead>
               <tr
@@ -129,6 +218,7 @@
                 <th class="py-4 px-6 w-16 text-center">No</th>
                 <th class="py-4 px-6">Informasi Dokumen</th>
                 <th class="py-4 px-4 text-center w-36">Sudah Dibaca</th>
+                <th class="py-4 px-4 text-center w-36">Terunduh</th>
                 <th class="py-4 px-4 text-center w-28">Total Klik</th>
                 <th class="py-4 px-4 text-center w-56">Aksi</th>
               </tr>
@@ -156,13 +246,6 @@
                 </tr>
               </template>
 
-              <tr v-else-if="error">
-                <td colspan="5" class="px-6 py-10 text-center">
-                  <p role="alert" class="text-sm text-red-600">{{ error }}</p>
-                  <button type="button" @click="fetchStats" class="mt-3 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">Coba lagi</button>
-                </td>
-              </tr>
-
               <!-- Real Data Rows -->
               <template v-else-if="paginatedStats.length > 0">
                 <tr v-for="(item, idx) in paginatedStats" :key="item.document_id"
@@ -172,10 +255,17 @@
                     <div class="font-semibold text-gray-900 text-sm break-words">{{ item.document_title }}</div>
                     <div class="text-xs text-gray-400 mt-0.5 break-words">No. Surat: {{ item.document_no_surat || '-' }}</div>
                   </td>
+                  <td class="py-10 mx-10 text-center w-28">
+                    <span
+                      class="inline-flex items-center px-2.5 py-1 mx-5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-100">
+                      {{ item.total_users_read }} Orang
+                    </span>
+                  </td>
                   <td class="py-4 px-6 text-center">
                     <span
-                      class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-100">
-                      {{ item.total_users_read }} Orang
+                      class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-100">
+                      {{ item.total_downloads ?? 0 }} Kali 
+                      <!-- ({{ item.total_users_downloaded ?? 0 }} Org) -->
                     </span>
                   </td>
                   <td class="py-4 px-6 text-center">
@@ -191,7 +281,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                       </svg>
-                      Detail Keterbacaan
+                      Detail
                     </button>
                   </td>
                 </tr>
@@ -199,7 +289,7 @@
 
               <!-- Empty State -->
               <tr v-else>
-                <td colspan="5" class="py-12 text-center text-gray-400">
+                <td colspan="6" class="py-12 text-center text-gray-400">
                   <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -258,7 +348,7 @@
         <!-- Modal Header -->
         <div class="p-6 border-b border-gray-100 flex items-start justify-between bg-gray-50/50">
           <div>
-            <h2 class="text-xl font-bold text-gray-900">Detail Keterbacaan Dokumen</h2>
+            <h2 class="text-xl font-bold text-gray-900">Detail Dokumen</h2>
             <p class="text-xs text-gray-400 mt-1">Dokumen: <strong class="text-gray-700 font-semibold">{{
               selectedDoc?.document_title }}</strong></p>
           </div>
@@ -279,6 +369,10 @@
             :class="['py-3 text-sm font-semibold border-b-2 px-1 transition duration-150', activeTab === 'viewed' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
             Sudah Baca ({{ viewedUsersList.length }})
           </button>
+          <button @click="activeTab = 'downloaded'"
+            :class="['py-3 text-sm font-semibold border-b-2 px-1 transition duration-150', activeTab === 'downloaded' ? 'border-sky-500 text-sky-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+            Terunduh ({{ downloadedUsersList.length }})
+          </button>
         </div>
 
         <!-- Modal Search Tab -->
@@ -297,9 +391,13 @@
             class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-100">
             {{ filteredUnviewedUsers.length }} Karyawan Belum Membaca
           </span>
-          <span v-else
+          <span v-else-if="activeTab === 'viewed'"
             class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-800 border border-green-100">
             {{ filteredViewedUsers.length }} Karyawan Sudah Membaca
+          </span>
+          <span v-else
+            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-100">
+            {{ filteredDownloadedUsers.length }} Karyawan Mengunduh
           </span>
         </div>
 
@@ -347,7 +445,7 @@
             </div>
 
             <!-- Tab Sudah Membaca -->
-            <div v-else>
+            <div v-else-if="activeTab === 'viewed'">
               <div v-if="filteredViewedUsers.length > 0" class="grid grid-cols-1 gap-4">
                 <div v-for="user in filteredViewedUsers" :key="user.username"
                   class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -383,6 +481,41 @@
                 <p class="text-xs text-gray-500 mt-0.5">Karyawan belum ada yang membuka dokumen ini.</p>
               </div>
             </div>
+
+            <!-- Tab Sudah Diunduh -->
+            <div v-else>
+              <div v-if="filteredDownloadedUsers.length > 0" class="grid grid-cols-1 gap-4">
+                <div v-for="user in filteredDownloadedUsers" :key="user.username"
+                  class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
+                      {{ user.full_name?.charAt(0).toUpperCase() || 'U' }}
+                    </div>
+                    <div class="overflow-hidden">
+                      <h4 class="font-semibold text-gray-900 text-xs truncate">{{ user.full_name }}</h4>
+                      <p class="text-[11px] text-gray-400">{{ user.username }}</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0">
+                    <div class="text-3xs text-gray-500 mr-2">
+                      <span class="block">Pertama: <strong class="text-gray-700 font-semibold">{{
+                        formatDetailDate(user.first_downloaded_at) }}</strong></span>
+                      <span class="block">Terakhir: <strong class="text-gray-700 font-semibold">{{
+                        formatDetailDate(user.last_downloaded_at) }}</strong></span>
+                    </div>
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded text-3xs font-medium bg-sky-100 text-sky-800">
+                      {{ user.download_count }}x Diunduh
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-center py-12 text-gray-400">
+                <p class="text-sm font-semibold text-gray-700">Belum Ada Unduhan</p>
+                <p class="text-xs text-gray-500 mt-0.5">Karyawan belum ada yang mengunduh dokumen ini.</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -396,7 +529,6 @@
 
       </div>
     </div>
-
   </div>
 </template>
 
@@ -407,6 +539,7 @@ const page = usePage();
 const isAudit = computed(() => page.props.auth?.role === 'audit');
 import { exportActivityLogs } from '@/services/mutations/reportMutation.ts';
 import { getDocumentViewStats, getUnviewedUsers, getViewedUsers } from '@/services/queries/documentViewQuery.ts';
+import { apiInstance as axios } from '@/utils/axios';
 
 const stats = ref([]);
 const loading = ref(false);
@@ -423,6 +556,7 @@ const activeTab = ref('unviewed'); // 'unviewed' atau 'viewed'
 const selectedDoc = ref(null);
 const unviewedUsersList = ref([]);
 const viewedUsersList = ref([]);
+const downloadedUsersList = ref([]);
 const modalLoading = ref(false);
 const modalError = ref('');
 const modalSearchQuery = ref('');
@@ -459,6 +593,14 @@ const totalClicks = computed(() => {
   return stats.value.reduce((acc, curr) => acc + parseInt(curr.total_clicks || 0), 0);
 });
 
+const totalDownloads = computed(() => {
+  return stats.value.reduce((acc, curr) => acc + parseInt(curr.total_downloads || 0), 0);
+});
+
+const totalUniqueDownloaders = computed(() => {
+  return stats.value.reduce((acc, curr) => acc + parseInt(curr.total_users_downloaded || 0), 0);
+});
+
 // 1. Filtered stats by search query
 const filteredStats = computed(() => {
   if (!searchQuery.value.trim()) return stats.value;
@@ -483,6 +625,12 @@ const sortedStats = computed(() => {
   }
   if (sortBy.value === 'clicks_asc') {
     return items.sort((a, b) => a.total_clicks - b.total_clicks);
+  }
+  if (sortBy.value === 'downloads_desc') {
+    return items.sort((a, b) => (b.total_downloads || 0) - (a.total_downloads || 0));
+  }
+  if (sortBy.value === 'downloads_asc') {
+    return items.sort((a, b) => (a.total_downloads || 0) - (b.total_downloads || 0));
   }
   if (sortBy.value === 'newest') {
     return items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -556,10 +704,12 @@ const showDetail = async (item) => {
   activeTab.value = 'unviewed';
 
   try {
-    const [resUnviewed, resViewed] = await Promise.all([
+    const [resUnviewed, resViewed, resDownloaded] = await Promise.all([
       getUnviewedUsers(item.document_id),
-      getViewedUsers(item.document_id)
+      getViewedUsers(item.document_id),
+      axios.get(`/api/document-downloads/document/${item.document_id}/users`).then(r => r.data).catch(() => ({ success: true, data: [] }))
     ]);
+    downloadedUsersList.value = resDownloaded?.data || [];
 
     if (resUnviewed.success && resViewed.success) {
       unviewedUsersList.value = resUnviewed.data;
@@ -585,6 +735,15 @@ const filteredUnviewedUsers = computed(() => {
   if (!modalSearchQuery.value.trim()) return unviewedUsersList.value;
   const q = modalSearchQuery.value.toLowerCase().trim();
   return unviewedUsersList.value.filter(user =>
+    user.full_name?.toLowerCase().includes(q) ||
+    user.username?.toLowerCase().includes(q)
+  );
+});
+
+const filteredDownloadedUsers = computed(() => {
+  if (!modalSearchQuery.value.trim()) return downloadedUsersList.value;
+  const q = modalSearchQuery.value.toLowerCase().trim();
+  return downloadedUsersList.value.filter(user =>
     user.full_name?.toLowerCase().includes(q) ||
     user.username?.toLowerCase().includes(q)
   );

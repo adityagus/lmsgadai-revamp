@@ -21,6 +21,9 @@ use App\Services\RoleAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Feature routes (content structure, certificates, document downloads) under /api.
+Route::middleware('session.auth')->group(base_path('routes/features.php'));
+
 Route::middleware('session.auth')->group(function () {
     Route::get('/learning-history', [LearningHistoryController::class, 'index']);
     Route::get('/learning-history/{id}', [LearningHistoryController::class, 'show'])->whereNumber('id');

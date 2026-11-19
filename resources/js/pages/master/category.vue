@@ -2,13 +2,17 @@
 	<div class="p-0 w-full min-h-screen bg-gray-50">
 		<div class="w-full max-w-6xl mx-auto py-8 px-4">
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-				<h1 class="text-3xl font-bold tracking-tight text-gray-800">Category Management</h1>
-				<button @click="openAddModal"
-					class="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition">Add
-					Category</button>
+				<h1 class="text-3xl font-bold tracking-tight text-gray-800">Kelola Kategori</h1>
+				<button @click="openAddModal"	
+					class="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transiTambahn">AddK
+					iategory</button>
 			</div>
 
-			<div class="bg-white rounded-xl shadow border overflow-x-auto">
+			<div v-if="error" class="mt-4 text-red-600 text-center">{{ error }} <button type="button" class="underline" @click="refetch()">Coba lagi</button></div>
+			<div v-if="success" class="mt-4 text-green-600 text-center" timeout="4000">{{ success }}</div>
+			<div v-if="loading" class="mt-4 text-center text-gray-500">Loading...</div>
+
+			<div class="bg-white rounded-xl shadow border overflow-x-auto mt-4">
 				<table class="w-full min-w-[500px]">
 					<thead>
 						<tr class="bg-gray-100 text-gray-700">
@@ -49,10 +53,6 @@
 					</tbody>
 				</table>
 			</div>
-
-			<div v-if="error" class="mt-4 text-red-600 text-center">{{ error }} <button type="button" class="underline" @click="refetch()">Coba lagi</button></div>
-			<div v-if="success" class="mt-4 text-green-600 text-center">{{ success }}</div>
-			<div v-if="loading" class="mt-4 text-center text-gray-500">Loading...</div>
 		</div>
 
 		<!-- Modal -->
@@ -60,11 +60,17 @@
 			<div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-lg mx-2 relative animate-fadeIn">
 				<h2 class="text-xl font-bold mb-4">{{ editMode ? 'Edit' : 'Add' }} Category</h2>
 				<form @submit.prevent="editMode ? updateCategory() : addCategory()">
-					<div class="mb-5">
+					<div class="mb-4">
 						<label class="block mb-1 font-medium">Name</label>
 						<input v-model="form.name" type="text"
-							class="w-full border px-4 py-2 rounded focus:outline-none focus:ring focus:ring-blue-200"
+							class="w-full border px-4 py-2 rounded focus:outline-none focus:ring focus:ring-purple-200"
 							required />
+					</div>
+					<div class="mb-5">
+						<label class="block mb-1 font-medium">Keterangan</label>
+						<textarea v-model="form.description" rows="3" maxlength="255"
+							placeholder="Deskripsi singkat kategori..."
+							class="w-full border px-4 py-2 rounded focus:outline-none focus:ring focus:ring-purple-200"></textarea>
 					</div>
 					<div class="flex justify-end gap-2">
 						<button type="button" @click="closeModal"
@@ -96,16 +102,16 @@ const update = useMutation(editCategory.options());
 const remove = useMutation(removeCategory.options());
 const modalLoading = computed(() => create.isPending.value || update.isPending.value);
 const showModal = ref(false), editMode = ref(false);
-const form = ref({ id: null, name: '' });
+const form = ref({ id: null, name: '', description: '' });
 const actionError = ref(''), success = ref(''), modalError = ref('');
 const error = computed(() => actionError.value || (queryError.value ? 'Kategori gagal dimuat. Silakan coba lagi.' : ''));
 
 function openAddModal() {
-  form.value = { id: null, name: '' };
+  form.value = { id: null, name: '', description: '' };
   editMode.value = false; showModal.value = true; modalError.value = '';
 }
 function openEditModal(cat) {
-  form.value = { id: cat.id, name: cat.name };
+  form.value = { id: cat.id, name: cat.name || '', description: cat.description || '' };
   editMode.value = true; showModal.value = true; modalError.value = '';
 }
 function closeModal() {
@@ -116,8 +122,9 @@ async function saveCategory(edit) {
   if (modalLoading.value) return;
   modalError.value = ''; actionError.value = ''; success.value = '';
   try {
-    if (edit) await update.mutateAsync([form.value.id, { name: form.value.name }]);
-    else await create.mutateAsync([{ name: form.value.name }]);
+    const payload = { name: form.value.name, description: form.value.description || '' };
+    if (edit) await update.mutateAsync([form.value.id, payload]);
+    else await create.mutateAsync([payload]);
     showModal.value = false;
     success.value = edit ? 'Kategori berhasil diperbarui.' : 'Kategori berhasil ditambahkan.';
   } catch (err) {

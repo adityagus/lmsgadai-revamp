@@ -71,6 +71,12 @@ class ActivityLogExcelExporter
             return $item->document_id . '_' . $item->username;
         });
 
+        $downloads = \Illuminate\Support\Facades\Schema::hasTable('document_downloads')
+            ? DB::table('document_downloads')->get()->keyBy(function ($item) {
+                return $item->document_id . '_' . $item->username;
+            })
+            : collect();
+
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         \PhpOffice\PhpSpreadsheet\Calculation\Calculation::getInstance($spreadsheet)->disableCalculationCache();
 
@@ -96,6 +102,10 @@ class ActivityLogExcelExporter
             'M' => 22,
             'N' => 22,
             'O' => 16,
+            'P' => 16,
+            'Q' => 22,
+            'R' => 22,
+            'S' => 16,
         ];
         foreach ($columnWidths as $c => $w) {
             $sheet->getColumnDimension($c)->setWidth($w);
@@ -116,13 +126,17 @@ class ActivityLogExcelExporter
             "Status Baca",
             "First Read",
             "Last Read",
-            "Jumlah Dibuka"
+            "Jumlah Dibuka",
+            "Status Unduh",
+            "First Download",
+            "Last Download",
+            "Jumlah Diunduh"
         ];
 
         $sheet->fromArray([$headers], null, 'A1');
         $sheet->getRowDimension(1)->setRowHeight(40);
 
-        $sheet->getStyle('A1:O1')->applyFromArray([
+        $sheet->getStyle('A1:S1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 10,
@@ -161,6 +175,8 @@ class ActivityLogExcelExporter
                     $key = $doc->id . '_' . $username;
                     $view = $views->get($key);
                     $hasViewed = $view !== null && (int)$view->view_count > 0;
+                    $dl = $downloads->get($key);
+                    $hasDownloaded = $dl !== null && (int)$dl->download_count > 0;
 
                     $userIdCode = 'USR-' . str_pad($userCounter++, 6, '0', STR_PAD_LEFT);
                     $nik = (string)($u->nik ?? '-');
@@ -185,6 +201,10 @@ class ActivityLogExcelExporter
                         $hasViewed && $view->first_viewed_at ? date('j M Y, H.i', strtotime($view->first_viewed_at)) : '0',
                         $hasViewed && $view->last_viewed_at ? date('j M Y, H.i', strtotime($view->last_viewed_at)) : '0',
                         $hasViewed ? (int)$view->view_count : 0,
+                        $hasDownloaded ? 'Sudah Diunduh' : 'Belum Diunduh',
+                        $hasDownloaded && $dl->first_downloaded_at ? date('j M Y, H.i', strtotime($dl->first_downloaded_at)) : '0',
+                        $hasDownloaded && $dl->last_downloaded_at ? date('j M Y, H.i', strtotime($dl->last_downloaded_at)) : '0',
+                        $hasDownloaded ? (int)$dl->download_count : 0,
                     ];
 
                     if (count($currentBatch) >= $batchSize) {
@@ -198,6 +218,8 @@ class ActivityLogExcelExporter
                 if ($docViews->isNotEmpty()) {
                     foreach ($docViews as $dv) {
                         $userIdCode = 'USR-' . str_pad($userCounter++, 6, '0', STR_PAD_LEFT);
+                        $dl = $downloads->get($doc->id . '_' . $dv->username);
+                        $hasDownloaded = $dl !== null && (int)$dl->download_count > 0;
                         $currentBatch[] = [
                             $docCode,
                             $noSurat,
@@ -214,6 +236,10 @@ class ActivityLogExcelExporter
                             $dv->first_viewed_at ? date('j M Y, H.i', strtotime($dv->first_viewed_at)) : '0',
                             $dv->last_viewed_at ? date('j M Y, H.i', strtotime($dv->last_viewed_at)) : '0',
                             (int)$dv->view_count,
+                            $hasDownloaded ? 'Sudah Diunduh' : 'Belum Diunduh',
+                            $hasDownloaded && $dl->first_downloaded_at ? date('j M Y, H.i', strtotime($dl->first_downloaded_at)) : '0',
+                            $hasDownloaded && $dl->last_downloaded_at ? date('j M Y, H.i', strtotime($dl->last_downloaded_at)) : '0',
+                            $hasDownloaded ? (int)$dl->download_count : 0,
                         ];
 
                         if (count($currentBatch) >= $batchSize) {

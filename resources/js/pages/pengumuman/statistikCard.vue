@@ -123,7 +123,9 @@ const page = usePage();
 const auth = computed(() => page.props.auth || null);
 const canManageDocuments = computed(() => {
   const user = auth.value;
-  return ['admin', 'sop'].includes(user?.role);
+  if (!user) return false;
+  const roles = Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role];
+  return roles.some((r) => ['admin', 'sop'].includes(String(r).toLowerCase()));
 });
 
 const icons = ref([

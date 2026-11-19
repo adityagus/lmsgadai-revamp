@@ -177,7 +177,8 @@ async function openDetail(card) {
   catch (error) { console.error('Failed to record document view', error); }
 }
 onMounted(async () => {
-  if (user.value.role === 'trainer') return;
+  const userRoles = Array.isArray(user.value.roles) && user.value.roles.length ? user.value.roles : [user.value.role];
+  if (user.value.role === 'trainer' && !userRoles.includes('sop') && !userRoles.includes('admin')) return;
   const [history, summary] = await Promise.allSettled([userOverview(), adminOverview()]);
   if (history.status === 'fulfilled') {
     lastCourses.value = history.value.data.last_courses || [];

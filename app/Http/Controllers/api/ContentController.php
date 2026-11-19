@@ -61,12 +61,24 @@ class ContentController extends Controller
     public function store(StoreContentRequest $request){
       $validated = $request->validated();
       $validated = $this->linkQuiz($request, $validated);
+      if (!empty($request->input('new_parent_title'))) {
+          $newParent = Content::create([
+              'course_id' => $validated['course_id'],
+              'title' => trim($request->input('new_parent_title')),
+              'type' => 'parent',
+              'order' => (int) (Content::where('course_id', $validated['course_id'])->max('order') ?? 0) + 1,
+          ]);
+          $validated['parent_id'] = $newParent->id;
+      } else if (array_key_exists('parent_id', $validated)) {
+          $validated['parent_id'] = (!empty($validated['parent_id']) && is_numeric($validated['parent_id'])) ? (int) $validated['parent_id'] : null;
+      }
       
-      // Jika type == 'pdf' dan ada file, upload file dan simpan path-nya
-      if ($request->get('type') === 'pdf' && $request->hasFile('content')) {
+      $type = $validated['type'] ?? $request->get('type');
+      // Jika type == 'dokumen' (atau legacy 'pdf') dan ada file, upload file dan simpan path-nya
+      if (in_array($type, ['dokumen', 'pdf'], true) && $request->hasFile('content')) {
           $contentPath = Content::uploadContent($request->file('content'));
           $validated['content'] = $contentPath;
-      }else if($request->get('type') === 'text' && $request->hasFile('lampiran')){
+      }else if($type === 'text' && $request->hasFile('lampiran')){
         $lampiranPath = Content::uploadLampiran($request->file('lampiran'));
         $validated['lampiran'] = $lampiranPath;
       }else{
@@ -102,9 +114,22 @@ class ContentController extends Controller
 
         $validated = $request->validated();
         $validated = $this->linkQuiz($request, $validated, $content);
+        if (!empty($request->input('new_parent_title'))) {
+            $courseId = $validated['course_id'] ?? $content->course_id;
+            $newParent = Content::create([
+                'course_id' => $courseId,
+                'title' => trim($request->input('new_parent_title')),
+                'type' => 'parent',
+                'order' => (int) (Content::where('course_id', $courseId)->max('order') ?? 0) + 1,
+            ]);
+            $validated['parent_id'] = $newParent->id;
+        } else if (array_key_exists('parent_id', $validated)) {
+            $validated['parent_id'] = (!empty($validated['parent_id']) && is_numeric($validated['parent_id'])) ? (int) $validated['parent_id'] : null;
+        }
 
-        // Jika type == 'pdf' dan ada file baru yang diunggah
-        if ($request->get('type') === 'pdf' && $request->hasFile('content')) {
+        $type = $validated['type'] ?? $request->get('type') ?? $content->type;
+        // Jika type == 'dokumen' (atau legacy 'pdf') dan ada file baru yang diunggah
+        if (in_array($type, ['dokumen', 'pdf'], true) && $request->hasFile('content')) {
             $contentPath = Content::uploadContent($request->file('content'));
             $validated['content'] = $contentPath;
         } else if (!$request->has('content') || $request->input('content') === 'undefined' || $request->input('content') === 'null') {
@@ -147,6 +172,10 @@ class ContentController extends Controller
         }
         app(\App\Services\CourseService::class)->assertAccessible((int) $content->course_id, request());
         app(\App\Services\Quiz\AttemptHistory::class)->content($content);
+
+        // Reset parent_id for any children of this content
+        Content::where('parent_id', $content->id)->update(['parent_id' => null]);
+
         $content->delete();
         
         return response()->json([
@@ -165,7 +194,16 @@ class ContentController extends Controller
         if ($id) {
             $quiz = $service->quiz($id);
             $service->manage($service->identity($request), $quiz);
-            abort_unless((int) $quiz->course_id === (int) ($data['course_id'] ?? $existing->course_id), 422, 'Quiz harus berasal dari course yang sama.');
+            $targetCourseId = (int) ($data['course_id'] ?? $existing->course_id);
+            if (\Illuminate\Support\Facades\Schema::hasTable('quiz_courses')) {
+                \Illuminate\Support\Facades\DB::table('quiz_courses')->insertOrIgnore([
+                    'quiz_id' => $quiz->id,
+                    'course_id' => $targetCourseId,
+                    'created_at' => now(),
+                ]);
+            } else {
+                abort_unless((int) $quiz->course_id === $targetCourseId, 422, 'Quiz harus berasal dari course yang sama.');
+            }
             $data['content'] = null;
         }
         $data['quiz_id'] = $id;

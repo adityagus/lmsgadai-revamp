@@ -11,3 +11,14 @@ export const recordDocumentView = defineMutation<[documentId: Id], ApiMessage>(
         (await http.post<ApiMessage>('/document-views', { document_id: documentId })).data,
     ['documentViews', 'reports', 'master', 'announcements'],
 );
+
+export async function logDocumentDownload(documentId: Id): Promise<ApiMessage> {
+    return (await http.post<ApiMessage>('/api/document-downloads', { document_id: Number(documentId) })).data;
+}
+
+export const recordDocumentDownload = defineMutation<[documentId: Id], ApiMessage>(
+    'documentDownloads',
+    'record',
+    logDocumentDownload,
+    ['documentDownloads', 'reports', 'documentViews'],
+);

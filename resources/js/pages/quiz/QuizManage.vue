@@ -11,7 +11,7 @@
         <div v-if="message" class="success" role="status">{{ message }}</div>
         <nav class="tabs workspace-tabs" aria-label="Bagian pengelolaan evaluasi">
             <button
-                v-for="t in ['Bank Soal', 'Peserta', 'Riwayat Kuis']"
+                v-for="t in ['Daftar Kuis', 'Bank Soal', 'Peserta', 'Riwayat Kuis']"
                 :key="t"
                 :class="{ selected: tab === t }"
                 :aria-pressed="tab === t"
@@ -25,6 +25,84 @@
         </nav>
         <p v-if="loading" class="sr-only" role="status">Memuat bank soal dan peserta...</p>
         <template v-if="loading || meta">
+            <section v-if="tab === 'Daftar Kuis'" class="panel quiz-library stack">
+                <header class="topbar">
+                    <div>
+                        <h2>Daftar Kuis (Bank Quiz)</h2>
+                        <p class="muted">Kelola kuis, hubungkan satu kuis ke banyak kelas, ubah status draft/terbitkan, dan pantau hasil evaluasi.</p>
+                    </div>
+                    <router-link to="/quiz/manage/new" class="button primary" style="text-decoration: none;">
+                        + Buat Bank Quiz
+                    </router-link>
+                </header>
+                <div class="row quiz-manage-filters" style="gap: 12px; flex-wrap: wrap;">
+                    <input
+                        v-model="quizSearch"
+                        type="search"
+                        placeholder="Cari judul kuis atau nama kelas..."
+                        style="flex: 1; min-width: 240px;"
+                    />
+                    <select v-model="quizStatusFilter" style="width: auto;">
+                        <option value="">Semua status</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="PUBLISHED">Diterbitkan</option>
+                        <option value="CLOSED">Ditutup</option>
+                    </select>
+                </div>
+                <p class="muted">{{ filteredQuizzes.length }} kuis ditemukan</p>
+                <div v-if="filteredQuizzes.length" class="stack" style="gap: 14px;">
+                    <article
+                        v-for="q in pagedQuizzes"
+                        :key="q.id"
+                        class="question-card-item stack"
+                        style="margin-bottom: 0;"
+                    >
+                        <div class="row" style="justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+                            <div>
+                                <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 4px;">{{ q.title }}</h3>
+                                <p class="muted" style="margin: 0; font-size: 13px;">
+                                    Kelas: <strong>{{ courseNames(q) }}</strong> · {{ q.question_count || 0 }} soal · {{ q.duration_minutes }} menit · Nilai kelulusan {{ q.passing_grade }}%
+                                </p>
+                            </div>
+                            <span
+                                class="badge"
+                                :style="q.status === 'PUBLISHED' ? 'background: #e6f9ed; color: #15803d;' : q.status === 'DRAFT' ? 'background: #fef3c7; color: #b45309;' : 'background: #fee2e2; color: #b91c1c;'"
+                            >
+                                {{ q.status === 'PUBLISHED' ? 'Diterbitkan' : q.status === 'DRAFT' ? 'Draft' : 'Ditutup' }}
+                            </span>
+                        </div>
+                        <div class="row" style="gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                            <router-link
+                                :to="`/quiz/manage/${q.id}`"
+                                class="button primary"
+                                style="font-size: 13px; padding: 6px 14px; text-decoration: none;"
+                            >
+                                Edit Kuis & Terbitkan
+                            </router-link>
+                            <router-link
+                                :to="`/quiz/manage/${q.id}/preview`"
+                                class="button"
+                                style="font-size: 13px; padding: 6px 14px; text-decoration: none;"
+                            >
+                                Pratinjau
+                            </router-link>
+                            <router-link
+                                :to="`/quiz/manage/${q.id}/results`"
+                                class="button"
+                                style="font-size: 13px; padding: 6px 14px; text-decoration: none;"
+                            >
+                                Hasil Kuis
+                            </router-link>
+                        </div>
+                    </article>
+                </div>
+                <p v-else class="empty">Tidak ada kuis yang sesuai filter.</p>
+                <nav v-if="quizPages > 1" class="question-pagination" aria-label="Halaman kuis">
+                    <button :disabled="quizPage === 1" @click="quizPage--">Sebelumnya</button>
+                    <span>{{ quizPage }} / {{ quizPages }}</span>
+                    <button :disabled="quizPage >= quizPages" @click="quizPage++">Berikutnya</button>
+                </nav>
+            </section>
             <template v-if="tab === 'Bank Soal'"
                 ><details class="panel bank-create mb-3">
                     <summary :aria-disabled="loading" @click="loading && $event.preventDefault()">
@@ -466,13 +544,18 @@ import QuestionImageInput from './QuestionImageInput.vue';
 const imageUploading = ref(false);
 import "./quiz.css";
 const route = useRoute(),
-    tab = ref("Bank Soal"),
+    tab = ref("Daftar Kuis"),
     error = ref(""),
     message = ref(""),
     busy = ref(false),
     loading = ref(true),
     meta = ref(null),
     questions = ref([]),
+    quizzes = ref([]),
+    quizSearch = ref(""),
+    quizStatusFilter = ref(""),
+    quizPage = ref(1),
+    quizPageSize = ref(10),
     bankName = ref(""),
     search = ref(""),
     bankFilter = ref(""),
@@ -481,9 +564,37 @@ const displayMeta = computed(() => meta.value ?? { banks: [], courses: [], stude
 const stats = computed(() => [
     { label: 'Bank soal', icon: 'book', color: '', value: displayMeta.value.banks.length },
     { label: 'Pertanyaan tersedia', icon: 'question', color: 'mint', value: questions.value.length },
-    { label: 'Soal digunakan', icon: 'check', color: 'peach', value: questions.value.filter(q => q.is_used).length },
+    { label: 'Daftar kuis', icon: 'check', color: 'peach', value: quizzes.value.length },
     { label: 'Karyawan aktif', icon: 'users', color: 'sky', value: displayMeta.value.students.length },
 ]);
+function courseName(id) {
+    if (!id) return 'Tanpa kelas';
+    const c = displayMeta.value.courses?.find(item => Number(item.id) === Number(id));
+    return c ? c.name : `Kelas #${id}`;
+}
+function courseNames(quiz) {
+    const ids = Array.isArray(quiz.course_ids) && quiz.course_ids.length
+        ? quiz.course_ids
+        : (quiz.course_id ? [quiz.course_id] : []);
+    if (!ids.length) return 'Tanpa kelas';
+    return ids.map(id => courseName(id)).join(', ');
+}
+const filteredQuizzes = computed(() => {
+    return quizzes.value.filter(q => {
+        const matchesStatus = !quizStatusFilter.value || q.status === quizStatusFilter.value;
+        const cName = courseNames(q).toLowerCase();
+        const qTitle = (q.title || "").toLowerCase();
+        const searchVal = quizSearch.value.trim().toLowerCase();
+        const matchesSearch = !searchVal || qTitle.includes(searchVal) || cName.includes(searchVal);
+        return matchesStatus && matchesSearch;
+    });
+});
+const quizPages = computed(() => Math.max(1, Math.ceil(filteredQuizzes.value.length / quizPageSize.value)));
+const pagedQuizzes = computed(() => {
+    const start = (quizPage.value - 1) * quizPageSize.value;
+    return filteredQuizzes.value.slice(start, start + quizPageSize.value);
+});
+watch([quizSearch, quizStatusFilter], () => { quizPage.value = 1; });
 const page = ref(1),
     pageSize = ref(5),
     typeFilter = ref(""),
@@ -599,8 +710,9 @@ async function load() {
     const data = await Promise.all([
         api("get", "metadata"),
         api("get", "questions"),
+        api("get", "manage"),
     ]);
-    [meta.value, questions.value] = data;
+    [meta.value, questions.value, quizzes.value] = data;
 }
 async function action(fn, msg) {
     busy.value = true;

@@ -14,6 +14,8 @@ return [
     ['course/{id}/preview', 'content-admin-preview', 'course-preview/index', 'Pratinjau kelas', 'instructor', true],
     ['student/kelas', 'studentCourses', 'Student/courses/index', 'Kelas saya', null, false],
     ['student/kelas/{id}', 'content-preview', 'course-preview/index', 'Ruang belajar', null, true],
+    ['student/kelas/{id}/selesai', 'courseCompletion', 'course-completion/index', 'Selesai belajar', null, false],
+    ['kelas/{id}/sertifikat', 'courseCertificate', 'course-certificate/index', 'Template sertifikat', 'instructor', false],
     ['student/quiz', 'studentQuiz', 'quiz/StudentQuiz', 'Kuis saya', null, false],
     ['student/quiz/attempt/{id}', 'quizAttempt', 'quiz/QuizAttempt', 'Pengerjaan kuis', null, true],
     ['quiz/manage', 'quizManage', 'quiz/QuizManage', 'Kelola kuis', 'instructor', false],

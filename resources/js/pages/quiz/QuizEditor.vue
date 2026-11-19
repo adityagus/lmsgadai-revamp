@@ -6,7 +6,11 @@
         <h1>{{ editingExisting ? 'Edit Quiz' : 'Buat Quiz' }}</h1>
         <p class="muted">Pilih satu course, isi informasi quiz, lalu tambahkan soal.</p>
       </div>
-      <button type="button" :disabled="busy || modalBusy" @click="leaveEditor">{{ embedded ? 'Kembali ke Materi' : 'Kembali ke Kelas' }}</button>
+      <div class="row" style="gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button v-if="meta && form.status === 'DRAFT'" type="button" class="primary" :disabled="busy || modalBusy" @click="requestPublish">Terbitkan Quiz</button>
+        <button v-if="!embedded" type="button" :disabled="busy || modalBusy" @click="leaveToBank">← Kembali ke Daftar Quiz</button>
+        <button type="button" :disabled="busy || modalBusy" @click="leaveEditor">{{ embedded ? '← Kembali ke Materi' : 'Ke Detail Kelas' }}</button>
+      </div>
     </header>
     <div v-if="error" ref="errorPanel" class="error" role="alert" tabindex="-1">{{ error }}</div>
     <p v-if="message" class="success" role="status">{{ message }}</p>
@@ -22,13 +26,78 @@
             <label class="field">Durasi pengerjaan (menit)<input v-model.number="form.duration_minutes" type="number" min="1" max="1440" required></label>
             <label class="field">Nilai minimal untuk lulus (0–100)<input v-model.number="form.passing_grade" type="number" min="0" max="100" step="0.01" :aria-invalid="!!gradeError"><small class="muted">Nilai akhir = poin yang diperoleh ÷ total bobot soal yang dikerjakan × 100. Total bobot soal terpilih: {{ totalQuestionWeight }} poin; tidak harus 100. Contoh: 4 benar dari 5 soal berbobot sama menghasilkan nilai 80.</small><small v-if="gradeError" class="error" role="alert">{{ gradeError }}</small></label>
           </div>
-          <label class="field">Course
-            <select v-model="form.course_id" :disabled="embedded || form.course_locked" required>
-              <option :value="null" disabled>Pilih satu course</option>
-              <option v-for="c in meta.courses" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
-            <small class="muted">Akses quiz mengikuti kelas. Tambahkan peserta khusus melalui halaman detail kelas.</small>
-          </label>
+          <div class="field" style="position: relative;">
+            <span>Kelas / Course Terhubung <small class="muted">(bisa pilih lebih dari 1 kelas untuk Bank Quiz)</small></span>
+
+            <!-- Selected Course Pills -->
+            <div v-if="selectedCourses.length" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+              <span
+                v-for="c in selectedCourses"
+                :key="'pill-' + c.id"
+                style="display: inline-flex; align-items: center; gap: 6px; background: #f3e8ff; color: #662fff; border: 1px solid #d8b4fe; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;"
+              >
+                <span>{{ c.name }}</span>
+                <button
+                  v-if="!form.course_locked && !(embedded && Number(c.id) === Number(props.courseId)) && selectedCourses.length > 1"
+                  type="button"
+                  @click="toggleCourse(c.id)"
+                  style="background: none; border: none; color: #662fff; cursor: pointer; font-weight: 700; padding: 0; line-height: 1;"
+                  aria-label="Hapus kelas"
+                >&times;</button>
+              </span>
+            </div>
+
+            <!-- Dropdown Trigger -->
+            <button
+              type="button"
+              :disabled="form.course_locked"
+              @click="courseDropdownOpen = !courseDropdownOpen"
+              style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; text-align: left; font-size: 14px; cursor: pointer;"
+            >
+              <span>{{ selectedCourses.length ? `${selectedCourses.length} kelas dipilih` : 'Pilih kelas / course...' }}</span>
+              <span style="font-size: 12px; color: #6b7280;">{{ courseDropdownOpen ? '▲' : '▼' }}</span>
+            </button>
+
+            <!-- Searchable Checklist Dropdown -->
+            <div
+              v-if="courseDropdownOpen && !form.course_locked"
+              style="margin-top: 6px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.08); padding: 10px; z-index: 30;"
+            >
+              <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                <input
+                  v-model="courseSearch"
+                  type="search"
+                  placeholder="Cari nama kelas..."
+                  style="flex: 1; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px;"
+                >
+                <button
+                  type="button"
+                  @click="courseDropdownOpen = false"
+                  style="padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;"
+                >Tutup</button>
+              </div>
+              <div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+                <label
+                  v-for="c in filteredCourses"
+                  :key="c.id"
+                  class="check"
+                  style="margin: 0; padding: 6px 8px; border-radius: 8px; cursor: pointer;"
+                  :style="isCourseSelected(c.id) ? 'background: #faf5ff;' : ''"
+                >
+                  <input
+                    type="checkbox"
+                    :value="Number(c.id)"
+                    :checked="isCourseSelected(c.id)"
+                    :disabled="form.course_locked || (embedded && Number(c.id) === Number(props.courseId))"
+                    @change="toggleCourse(c.id)"
+                  >
+                  <span>{{ c.name }}</span>
+                </label>
+                <p v-if="!filteredCourses.length" class="muted" style="padding: 8px; margin: 0; font-size: 13px;">Kelas tidak ditemukan.</p>
+              </div>
+            </div>
+            <small class="muted">Akses quiz mengikuti kelas yang dipilih.</small>
+          </div>
         </fieldset>
         <label class="field quiz-attempt-field">Jumlah kesempatan mengerjakan<input v-model.number="form.maximum_attempt" :disabled="busy" type="number" min="0" max="100"><small class="muted">Jumlah Kesempatan Percobaan Pengerjaan. Tulis 0 jika tanpa batas</small></label>
         <label class="check"><input v-model="form.no_schedule" type="checkbox" :disabled="busy || form.has_attempts" @change="form.no_schedule && (form.release_after_close = false)">Tanpa batas tanggal pengerjaan</label>
@@ -159,6 +228,7 @@ import QuestionImageInput from './QuestionImageInput.vue';
 import QuizDialog from './QuizDialog.vue';
 import './quiz.css';
 
+
 const props = defineProps({ courseId: { type: [Number, String], default: null }, quizId: { type: [Number, String], default: null } });
 const emit = defineEmits(['saved', 'cancel']);
 const route = useRoute(), router = useRouter();
@@ -170,6 +240,7 @@ const loading = ref(true), busy = ref(false), modalBusy = ref(false), saveStatus
 const modal = ref(''), modalError = ref('');
 const form = ref({
   title:'', description:'', course_id:Number(props.courseId || route.query.course_id) || null,
+  course_ids: (props.courseId || route.query.course_id) ? [Number(props.courseId || route.query.course_id)] : [],
   duration_minutes:45, passing_grade:0, maximum_attempt:1, grading_method:'highest', question_count:1,
   no_schedule:false, available_from:localInput(new Date().toISOString()), available_until:localInput(new Date(Date.now()+30*86400000).toISOString()),
   status:'DRAFT', randomize_question:true, randomize_answer:false,
@@ -184,7 +255,40 @@ const resultSettings = [
 ];
 const statusLabel = computed(() => ({DRAFT:'Draft',PUBLISHED:'Diterbitkan',CLOSED:'Ditutup'})[form.value.status]);
 const saveLabel = computed(() => ({empty:'Belum disimpan',pending:'Ada perubahan belum disimpan',saving:'Menyimpan...',saved:'Tersimpan',error:'Gagal menyimpan. Coba simpan kembali.'})[saveStatus.value]);
-const selectedCourseName = computed(() => meta.value?.courses.find(c => Number(c.id)===Number(form.value.course_id))?.name || 'Course belum dipilih');
+const courseDropdownOpen = ref(false);
+const courseSearch = ref('');
+const filteredCourses = computed(() => {
+  const list = meta.value?.courses || [];
+  const q = courseSearch.value.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(c => String(c.name || '').toLowerCase().includes(q));
+});
+const selectedCourses = computed(() => {
+  const list = meta.value?.courses || [];
+  const ids = form.value.course_ids?.length ? form.value.course_ids : (form.value.course_id ? [form.value.course_id] : []);
+  return ids.map(cid => list.find(c => Number(c.id) === Number(cid))).filter(Boolean);
+});
+const selectedCourseName = computed(() => {
+  const ids = form.value.course_ids?.length ? form.value.course_ids : (form.value.course_id ? [form.value.course_id] : []);
+  if (!ids.length) return 'Course belum dipilih';
+  return ids.map(cid => meta.value?.courses.find(c => Number(c.id) === Number(cid))?.name || `Kelas #${cid}`).join(', ');
+});
+function isCourseSelected(cid) {
+  const ids = form.value.course_ids?.length ? form.value.course_ids : (form.value.course_id ? [form.value.course_id] : []);
+  return ids.some(x => Number(x) === Number(cid));
+}
+function toggleCourse(cid) {
+  const num = Number(cid);
+  const current = new Set((form.value.course_ids || []).map(Number));
+  if (current.has(num)) {
+    if (current.size <= 1) return;
+    current.delete(num);
+  } else {
+    current.add(num);
+  }
+  form.value.course_ids = Array.from(current);
+  form.value.course_id = form.value.course_ids[0] ?? null;
+}
 const quizQuestions = computed(() => form.value.question_ids.map(id => allQuestions.value.find(q => Number(q.id)===Number(id))).filter(Boolean));
 const totalQuestionWeight = computed(() => Math.round(quizQuestions.value.reduce((sum, q) => sum + Number(q.weight), 0) * 100) / 100);
 const gradeError = computed(() => passingGradeError(form.value.passing_grade));
@@ -273,6 +377,10 @@ async function saveManual(status, finish=true) {
 }
 function requestPublish() { const issue=validation('PUBLISHED'); if(issue) return showError(issue); openModal('publish'); }
 async function preview() { if(await saveManual(form.value.status,false)) router.push(`/quiz/manage/${id.value}/preview`); }
+async function leaveToBank() {
+  if ((revision!==savedRevision || explanationDirty.value.size) && !(await saveManual(form.value.status,false))) return;
+  router.push('/quiz/manage');
+}
 async function leaveEditor() {
   if ((revision!==savedRevision || explanationDirty.value.size) && !(await saveManual(form.value.status,false))) return;
   rememberDraft(null);
@@ -387,6 +495,7 @@ onMounted(async()=>{
       [...resultSettings.map(s=>s.key),'randomize_question','randomize_answer'].forEach(k=>data[k]=!!data[k]);
       data.overrides=data.overrides.map(o=>({...o,persisted:true,available_from:localInput(o.available_from),available_until:localInput(o.available_until)}));
       for(const q of allQuestions.value) {if(Object.prototype.hasOwnProperty.call(data.question_explanations || {},q.id))q.explanation=data.question_explanations[q.id];}
+      data.course_ids = Array.isArray(data.course_ids) && data.course_ids.length ? data.course_ids.map(Number) : (data.course_id ? [Number(data.course_id)] : []);
       form.value=data;saveStatus.value='saved';
       if(!embedded.value && String(route.params.id)!==String(id.value))await router.replace('/quiz/manage/'+id.value);
     }

@@ -398,7 +398,7 @@ import { getPopularCourses } from "@/services/queries/courseQuery.ts";
 import "primeicons/primeicons.css";
 const page = usePage();
 const signedIn = computed(() => Boolean(page.props.auth?.user));
-const isTrainee = computed(() => Boolean(page.props.auth?.is_trainee || String(page.props.auth?.idgrup || '').toUpperCase().startsWith('JBT-748')));
+const isTrainee = computed(() => Boolean(page.props.auth?.is_trainee || String(page.props.auth?.idgrup || '').toUpperCase().startsWith('JBT-053')));
 const menuOpen = ref(false);
 const {
     data: courseData,

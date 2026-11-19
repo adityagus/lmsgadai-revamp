@@ -81,7 +81,7 @@
                 lain.
             </p>
         </details>
-        <template v-else-if="canManage">
+        <template v-if="canManage">
             <section v-if="!batches.length" class="empty">
                 <h2>
                     {{

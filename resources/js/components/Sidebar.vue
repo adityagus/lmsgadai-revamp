@@ -415,6 +415,7 @@ const hasAuthRole = (roleToCheck) => {
 };
 
 const isTrainee = computed(() => {
+    if (hasAuthRole("trainee")) return true;
     if (auth.value?.is_trainee !== undefined) return Boolean(auth.value.is_trainee);
     const idgrup = String(auth.value?.idgrup || '').toUpperCase();
     return idgrup === 'JBT-053' || idgrup.startsWith('JBT-053');
@@ -425,6 +426,7 @@ const quizManager = computed(
         !isTrainee.value && (
             hasAuthRole("admin") ||
             hasAuthRole("trainer") ||
+            hasAuthRole("sop") ||
             hasAuthRole("teacher") ||
             ["JBT-032", "JBT-038", "JBT-019", "042"].includes(auth.value?.idgrup)
         ),

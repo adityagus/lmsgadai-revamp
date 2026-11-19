@@ -39,8 +39,9 @@
         <div class="overflow-hidden rounded-xl sm:rounded-2xl mx-0 relative">
           <ContentPdf
             :content="selectedCard.content_url || selectedCard.url || selectedCard.file || selectedCard.content || selectedCard.lampiran || selectedCard.path || selectedCard.file_path"
+            :documentId="selectedCard.id"
             class="min-h-[350px] sm:min-h-[500px]"
-            v-if="selectedCard.type === 'pdf' || selectedCard.type === null || !selectedCard.type"
+            v-if="selectedCard.type === 'pdf' || selectedCard.type === 'dokumen' || selectedCard.type === null || !selectedCard.type"
           />
           <ContentText :content="selectedCard"
             class='shadow-sm shadow-purple-600 mt-4 pb-3 px-3 border mx-2 rounded-lg'
@@ -59,6 +60,7 @@ import { ref, computed, onMounted, defineExpose } from 'vue';
 import ContentPdf from '@/pages/course-preview/ContentPdf.vue';
 import ContentText from '@/pages/course-preview/ContentText.vue';
 import { getSession } from '@/services/queries/authQuery.ts';
+import { logDocumentDownload } from '@/services/mutations/documentViewMutation.ts';
 import { formDownloadUrl, downloadForm } from '@/utils/formDownload.js';
 import Swal from 'sweetalert2';
 
@@ -104,7 +106,10 @@ function openModal(card) {
   const downloadUrl = formDownloadUrl(card);
   if (downloadUrl !== null) {
     closeModal();
-    if (downloadUrl) downloadForm(downloadUrl);
+    if (downloadUrl) {
+      if (card?.id) logDocumentDownload(card.id).catch(() => {});
+      downloadForm(downloadUrl);
+    }
     else Swal.fire({ icon: 'error', title: 'File formulir tidak tersedia', text: 'Hubungi pengelola dokumen untuk melengkapi file.' });
     return;
   }

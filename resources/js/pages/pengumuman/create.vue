@@ -127,7 +127,7 @@
             required>
             <option disabled value="">Pilih Tipe File</option>
             <option value="text">Text</option>
-            <option value="pdf">PDF</option>
+            <option value="pdf">Dokumen</option>
           </select>
           <span v-if="errors.type" class="text-xs text-red-500 mt-1">{{ errors.type }}</span>
         </div>
@@ -145,9 +145,9 @@
           <!-- Input file baru -->
           <div class="mb-4">
             <label class="block text-xs sm:text-sm font-semibold mb-1" for="file">
-              Upload File PDF <span class="text-red-500">*</span>
+              Unggah Berkas <span class="text-red-500">*</span>
             </label>
-            <input id="file" type="file" accept="application/pdf" @change="onFileChange"
+            <input id="file" type="file" accept=".pdf,.doc,.docx,.pptx,.xlsx,.xls" @change="onFileChange"
               class="w-full border rounded px-3 py-2 text-xs sm:text-sm focus:outline-sidebar" :class="{ 'border-red-500': errors.dokumen }"
               :required="!isEditMode" />
             <span class='text-xs text-gray-500'>(Max. File size: {{ MAX_FILE_SIZE_MB }} MB)</span>
@@ -458,7 +458,8 @@ function prevStep() {
 const file = ref(null)
 const fileName = ref('')
 const uploadProgress = ref(0)
-const MAX_FILE_SIZE_MB = 20
+// 20 
+const MAX_FILE_SIZE_MB = 2
 
 const typeDocuments = ref([])
 const areas = ref([]);
@@ -588,7 +589,7 @@ function onSubmit() {
   if (!regionals_id.value.length) { step.value = 2; return; }
   if (!kd_jabatan.value.length) return;
   if (type.value === 'pdf' && !file.value && !urlThumbnail.value) {
-    setErrors({ dokumen: 'File PDF wajib dipilih.' });
+    setErrors({ dokumen: 'File dokumen wajib dipilih.' });
     step.value = 1;
     return;
   }
@@ -604,10 +605,12 @@ function onFileChange(e) {
     return;
   }
 
-  if (f.type !== 'application/pdf' || (f.size / 1024 / 1024) > MAX_FILE_SIZE_MB) {
+  const allowedExts = ['pdf', 'doc', 'docx', 'pptx', 'xlsx', 'xls'];
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  if (!allowedExts.includes(ext) || (f.size / 1024 / 1024) > MAX_FILE_SIZE_MB) {
     Swal.fire({
       title: 'File tidak valid',
-      text: `Pilih file PDF maksimal ${MAX_FILE_SIZE_MB} MB.`,
+      text: `Pilih file dengan format .pdf, .doc, .docx, .pptx, .xlsx, atau .xls (maksimal ${MAX_FILE_SIZE_MB} MB).`,
       icon: 'warning'
     });
     e.target.value = ''; // reset input

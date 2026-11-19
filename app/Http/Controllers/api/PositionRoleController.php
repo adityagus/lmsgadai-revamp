@@ -93,6 +93,12 @@ class PositionRoleController extends Controller
                 'badge_color' => 'bg-amber-100 text-amber-700 border-amber-200',
                 'description' => 'Akses pemeriksaan: Laporan pembacaan dokumen dan Log aktivitas pengguna (read-only).',
             ],
+            [
+                'role' => 'trainee',
+                'label' => 'Trainee (Peserta Training)',
+                'badge_color' => 'bg-teal-100 text-teal-700 border-teal-200',
+                'description' => 'Akses khusus peserta training: hanya dapat membuka menu Pembelajaran (Kelas & Kuis).',
+            ],
         ];
 
         // Return user roles as primary data, fallback to position roles if empty

@@ -117,8 +117,8 @@ class DocumentViewRepository implements DocumentViewRepositoryInterface
      */
     public function getDocumentViewStats(): Collection
     {
-        // Menghitung statistik keterbacaan per dokumen
-        return DB::table('documents as d')
+        // Menghitung statistik keterbacaan dan unduhan per dokumen
+        $stats = DB::table('documents as d')
             ->leftJoin('document_views as dv', 'd.id', '=', 'dv.document_id')
             ->select(
                 'd.id as document_id',
@@ -126,10 +126,30 @@ class DocumentViewRepository implements DocumentViewRepositoryInterface
                 'd.no_surat as document_no_surat',
                 'd.created_at',
                 DB::raw('COUNT(dv.username) as total_users_read'),
-                DB::raw('IFNULL(SUM(dv.view_count), 0) as total_clicks')
+                DB::raw('COALESCE(SUM(dv.view_count), 0) as total_clicks')
             )
             ->whereNull('d.deleted_at')
             ->groupBy('d.id', 'd.title', 'd.no_surat', 'd.created_at')
             ->get();
+
+        $downloadStats = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('document_downloads')) {
+            $downloadStats = DB::table('document_downloads')
+                ->select(
+                    'document_id',
+                    DB::raw('COUNT(username) as total_users_downloaded'),
+                    DB::raw('COALESCE(SUM(download_count), 0) as total_downloads')
+                )
+                ->groupBy('document_id')
+                ->get()
+                ->keyBy('document_id');
+        }
+
+        return $stats->map(function ($row) use ($downloadStats) {
+            $dl = $downloadStats->get($row->document_id);
+            $row->total_users_downloaded = $dl ? (int) $dl->total_users_downloaded : 0;
+            $row->total_downloads = $dl ? (int) $dl->total_downloads : 0;
+            return $row;
+        });
     }
 }

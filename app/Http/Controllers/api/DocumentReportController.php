@@ -204,6 +204,12 @@ class DocumentReportController extends Controller
             return $item->document_id . '_' . $item->username;
         });
 
+        $downloads = \Illuminate\Support\Facades\Schema::hasTable('document_downloads')
+            ? DB::table('document_downloads')->get()->keyBy(function ($item) {
+                return $item->document_id . '_' . $item->username;
+            })
+            : collect();
+
         $logs = [];
         $userCounter = 125;
 
@@ -219,6 +225,8 @@ class DocumentReportController extends Controller
                     $key = $doc->id . '_' . $username;
                     $view = $views->get($key);
                     $hasViewed = $view !== null && (int)$view->view_count > 0;
+                    $dl = $downloads->get($key);
+                    $hasDownloaded = $dl !== null && (int)$dl->download_count > 0;
 
                     $userIdCode = 'USR-' . str_pad($userCounter++, 6, '0', STR_PAD_LEFT);
                     $nik = $u->nik ?? '-';
@@ -243,6 +251,10 @@ class DocumentReportController extends Controller
                         'first_read' => $hasViewed && $view->first_viewed_at ? date('j M Y, H.i', strtotime($view->first_viewed_at)) : '0',
                         'last_read' => $hasViewed && $view->last_viewed_at ? date('j M Y, H.i', strtotime($view->last_viewed_at)) : '0',
                         'jumlah_dibuka' => $hasViewed ? (int)$view->view_count : 0,
+                        'status_unduh' => $hasDownloaded ? 'Sudah Diunduh' : 'Belum Diunduh',
+                        'first_download' => $hasDownloaded && $dl->first_downloaded_at ? date('j M Y, H.i', strtotime($dl->first_downloaded_at)) : '0',
+                        'last_download' => $hasDownloaded && $dl->last_downloaded_at ? date('j M Y, H.i', strtotime($dl->last_downloaded_at)) : '0',
+                        'jumlah_diunduh' => $hasDownloaded ? (int)$dl->download_count : 0,
                     ];
                 }
             } else {
@@ -250,6 +262,8 @@ class DocumentReportController extends Controller
                 if ($docViews->isNotEmpty()) {
                     foreach ($docViews as $dv) {
                         $userIdCode = 'USR-' . str_pad($userCounter++, 6, '0', STR_PAD_LEFT);
+                        $dl = $downloads->get($doc->id . '_' . $dv->username);
+                        $hasDownloaded = $dl !== null && (int)$dl->download_count > 0;
                         $logs[] = [
                             'document_id_code' => $docCode,
                             'nomor_dokumen' => $noSurat,
@@ -266,6 +280,10 @@ class DocumentReportController extends Controller
                             'first_read' => $dv->first_viewed_at ? date('j M Y, H.i', strtotime($dv->first_viewed_at)) : '0',
                             'last_read' => $dv->last_viewed_at ? date('j M Y, H.i', strtotime($dv->last_viewed_at)) : '0',
                             'jumlah_dibuka' => (int)$dv->view_count,
+                            'status_unduh' => $hasDownloaded ? 'Sudah Diunduh' : 'Belum Diunduh',
+                            'first_download' => $hasDownloaded && $dl->first_downloaded_at ? date('j M Y, H.i', strtotime($dl->first_downloaded_at)) : '0',
+                            'last_download' => $hasDownloaded && $dl->last_downloaded_at ? date('j M Y, H.i', strtotime($dl->last_downloaded_at)) : '0',
+                            'jumlah_diunduh' => $hasDownloaded ? (int)$dl->download_count : 0,
                         ];
                     }
                 }
@@ -339,6 +357,12 @@ class DocumentReportController extends Controller
         $views = DB::table('document_views')->get()->keyBy(function ($item) {
             return $item->document_id . '_' . $item->username;
         });
+
+        $downloads = \Illuminate\Support\Facades\Schema::hasTable('document_downloads')
+            ? DB::table('document_downloads')->get()->keyBy(function ($item) {
+                return $item->document_id . '_' . $item->username;
+            })
+            : collect();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         \PhpOffice\PhpSpreadsheet\Calculation\Calculation::getInstance($spreadsheet)->disableCalculationCache();
@@ -430,6 +454,8 @@ class DocumentReportController extends Controller
                     $key = $doc->id . '_' . $username;
                     $view = $views->get($key);
                     $hasViewed = $view !== null && (int)$view->view_count > 0;
+                    $dl = $downloads->get($key);
+                    $hasDownloaded = $dl !== null && (int)$dl->download_count > 0;
 
                     $userIdCode = 'USR-' . str_pad($userCounter++, 6, '0', STR_PAD_LEFT);
                     $nik = (string)($u->nik ?? '-');

@@ -46,7 +46,9 @@ class TrainingBatchController extends Controller
             ->orderByDesc('id')->get(['id', 'name', 'description', 'status', 'starts_on', 'ends_on']);
         $links = DB::table('training_batch_courses')->whereIn('batch_id', $batches->pluck('id'))->get();
         $courses = DB::table('courses')->whereIn('id', $links->pluck('course_id'))->get(['id', 'name']);
-        $contents = DB::table('course_details')->whereIn('course_id', $courses->pluck('id'))->orderBy('order')->orderBy('id')->get()->groupBy('course_id');
+        $contents = DB::table('course_details')->whereIn('course_id', $courses->pluck('id'))
+            ->where('type', '!=', 'parent')
+            ->orderBy('order')->orderBy('id')->get()->groupBy('course_id');
         $summaries = $courses->mapWithKeys(function ($course) use ($r, $username, $contents) {
             $items = $contents->get($course->id, collect());
             $completed = app(\App\Services\CourseSequence::class)->completed($items, $course->id, $username)->count();
@@ -68,7 +70,7 @@ class TrainingBatchController extends Controller
         if (!RoleAccess::isManager($r)) $members = $members->filter(fn ($u) => $u === $r->session()->get('auth.user'))->values();
         $names = $directory->names($members->all());
         $courses = DB::table('courses')->whereIn('id', DB::table('training_batch_courses')->where('batch_id', $id)->select('course_id'))->get(['id', 'name']);
-        $contents = DB::table('course_details')->whereIn('course_id', $courses->pluck('id'))->get()->groupBy('course_id');
+        $contents = DB::table('course_details')->whereIn('course_id', $courses->pluck('id'))->where('type', '!=', 'parent')->get()->groupBy('course_id');
         $completed = Schema::hasTable('course_content_progress') ? DB::table('course_content_progress')
             ->whereIn('username', $members)->whereIn('course_id', $courses->pluck('id'))->whereNotNull('completed_at')
             ->get(['username', 'content_id'])->groupBy('username')->map(fn ($rows) => $rows->pluck('content_id')->flip()) : collect();
